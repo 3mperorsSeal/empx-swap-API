@@ -1,0 +1,42 @@
+paths:
+  /v1/admin/seed:
+    post:
+      tags:
+        - Dashboard
+      summary: Seed tiers, endpoints and chain adapters (admin)
+      description: "Idempotent seeding endpoint to populate default tiers, endpoints, tier configs and chain adapters. Requires a bearer JWT with admin role."
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: Optional body to control seeding (not used currently)
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+              additionalProperties: false
+      responses:
+        "200":
+          description: Seed completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  tiers:
+                    type: number
+                  endpoints:
+                    type: number
+                  adapters:
+                    type: number
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Server error
+components: {}

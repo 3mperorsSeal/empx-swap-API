@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model api_keys {
+  id                  Int              @id @default(autoincrement())
+  key_prefix          String           @unique @db.VarChar(32)
+  key_hash            String
+  user_id             Int?
+  tier                String           @default("free") @db.VarChar(32)
+  whitelisted_ips     Json?            @default("[]")
+  whitelisted_domains Json?            @default("[]")
+  revoked             Boolean?         @default(false)
+  created_at          DateTime?        @default(now()) @db.Timestamptz(6)
+  rotated_at          DateTime?        @db.Timestamptz(6)
+  users               users?           @relation(fields: [user_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  api_usage_logs      api_usage_logs[] @ignore
+
+  @@index([key_prefix], map: "idx_api_keys_prefix")
+}
+
+/// This table is a partition table and requires additional setup for migrations. Visit https://pris.ly/d/partition-tables for more info.
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model api_usage_logs {
+  id         BigInt    @default(autoincrement())
+  api_key_id Int?
+  path       String
+  method     String
+  status     Int
+  cost       Int?      @default(1)
+  ip         String?   @db.Inet
+  request_id String?
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  api_keys   api_keys? @relation(fields: [api_key_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+
+  // This matches the PRIMARY KEY (id, created_at) from the SQL migration
+  @@id([id, created_at])
+  @@index([api_key_id], map: "idx_api_usage_api_key")
+  @@index([request_id], map: "idx_api_usage_request_id")
+  // Keep @ignore so Prisma doesn't try to manage the partition tables
+  @@ignore
+}
+
+model chain_adapters {
+  id              Int       @id @default(autoincrement())
+  chain_id        Int
+  chain           chains    @relation(fields: [chain_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
+  adapter_name    String
+  max_rpc_per_min Int?      @default(0)
+  fee_per_call    Decimal?  @default(0) @db.Decimal(18, 8)
+  priority        Int?      @default(100)
+  metadata        Json?     @default("{}")
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@unique([chain_id, adapter_name])
+  @@index([chain_id], map: "idx_chain_adapters_chain")
+  @@index([chain_id, priority], map: "idx_chain_adapters_priority")
+}
+
+model chains {
+  id              Int              @id @default(autoincrement())
+  chain_id        String           @unique @db.VarChar(64)
+  name            String?
+  rpc_urls        Json?            @default("[]")
+  native_currency Json?            @default("{}")
+  metadata        Json?            @default("{}")
+  created_at      DateTime?        @default(now()) @db.Timestamptz(6)
+  chain_adapters  chain_adapters[]
+  chain_tokens    chain_tokens[]
+}
+
+model tokens {
+  id           Int            @id @default(autoincrement())
+  symbol       String
+  name         String?
+  decimals     Int?
+  coingecko_id String?
+  metadata     Json?          @default("{}")
+  created_at   DateTime?      @default(now()) @db.Timestamptz(6)
+  chain_tokens chain_tokens[]
+
+  @@unique([symbol, coingecko_id])
+}
+
+model chain_tokens {
+  id            Int       @id @default(autoincrement())
+  chain_id      Int
+  token_id      Int?
+  token_address String    @db.VarChar(255)
+  metadata      Json?     @default("{}")
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  chains chains  @relation(fields: [chain_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
+  tokens tokens? @relation(fields: [token_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+
+  @@unique([chain_id, token_address])
+  @@index([chain_id], map: "idx_chain_tokens_chain")
+  @@index([token_id], map: "idx_chain_tokens_token")
+}
+
+model endpoints {
+  id                    Int                     @id @default(autoincrement())
+  path                  String
+  method                String
+  description           String?
+  created_at            DateTime?               @default(now()) @db.Timestamptz(6)
+  tier_endpoint_configs tier_endpoint_configs[]
+
+  @@unique([path, method])
+}
+
+model tier_endpoint_configs {
+  id                Int       @id @default(autoincrement())
+  tier_id           Int
+  endpoint_id       Int
+  rate_limit        Int?      @default(0)
+  quota             Int?      @default(0)
+  price_per_request Decimal?  @default(0) @db.Decimal(18, 8)
+  metadata          Json?     @default("{}")
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  endpoints         endpoints @relation(fields: [endpoint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tiers             tiers     @relation(fields: [tier_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tier_id, endpoint_id])
+  @@index([endpoint_id], map: "idx_tier_endpoint_endpoint")
+  @@index([tier_id], map: "idx_tier_endpoint_tier")
+}
+
+model tiers {
+  id                    Int                     @id @default(autoincrement())
+  name                  String                  @unique
+  description           String?
+  features              Json?                   @default("{}")
+  created_at            DateTime?               @default(now()) @db.Timestamptz(6)
+  tier_endpoint_configs tier_endpoint_configs[]
+}
+
+model partners {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_name   String    @db.Text
+  website        String?   @db.Text
+  wallet_address String    @unique @db.Text // This already creates an index!
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  updated_at     DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([company_name], map: "idx_partners_company_name")
+  @@index([created_at], map: "idx_partners_created_at") // Added for sorting performance
+}
+
+model users {
+  id            Int        @id @default(autoincrement())
+  email         String?    @unique
+  name          String?
+  role          String?    @default("user") @db.VarChar(32)
+  password_hash String?
+  created_at    DateTime?  @default(now()) @db.Timestamptz(6)
+  api_keys      api_keys[]
+}
+
+/// Tracks purchased monthly credits for an api key or user (one row per month)
+model api_usage_quotas_monthly {
+  id                Int       @id @default(autoincrement())
+  api_key_id        Int?
+  user_id           Int?
+  year              Int
+  month             Int
+  purchased_credits Int       @default(0)
+  used_credits      Int       @default(0)
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime? @updatedAt @db.Timestamptz(6)
+
+  @@unique([api_key_id, year, month])
+}
+
+/// Tracks per-day free quota usage per api key or user
+model api_usage_quotas_daily {
+  id           Int       @id @default(autoincrement())
+  api_key_id   Int?
+  user_id      Int?
+  date         DateTime  @db.Date
+  used_credits Int       @default(0)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@unique([api_key_id, date])
+}
+
+/// Idempotency for execution endpoints - prevents duplicate execution
+model idempotency_keys {
+  id              Int       @id @default(autoincrement())
+  idempotency_key String    @unique @db.VarChar(64)
+  request_hash    String?   @db.VarChar(64)
+  stored_response Json?
+  status          String    @default("pending") @db.VarChar(32)
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  expires_at      DateTime? @db.Timestamptz(6)
+
+  @@index([idempotency_key], map: "idx_idempotency_key")
+}
+
+/// Pending transaction jobs - for queue-based execution
+model pending_transactions {
+  id             Int       @id @default(autoincrement())
+  transaction_id String    @unique @db.VarChar(64)
+  chain_id       Int
+  payload        Json
+  status         String    @default("pending") @db.VarChar(32)
+  tx_hash        String?   @db.VarChar(66)
+  error_message  String?   @db.Text
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime? @updatedAt @db.Timestamptz(6)
+
+  @@index([status], map: "idx_pending_tx_status")
+}
+
+/// Partner/API key usage logging (enterprise API key system)
+model partner_usage_logs {
+  id          Int      @id @default(autoincrement())
+  api_key_id  Int?
+  endpoint    String   @db.VarChar(255)
+  method      String   @db.VarChar(16)
+  status      Int
+  duration_ms Int?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([api_key_id], map: "idx_partner_usage_key")
+  @@index([created_at], map: "idx_partner_usage_created")
+}

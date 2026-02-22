@@ -1,0 +1,148 @@
+paths:
+  /v1/chains:
+    get:
+      tags:
+        - Chains
+      summary: List supported chains
+      description: Returns the supported blockchain networks (chainId and name).
+      operationId: getChains
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                  total:
+                    type: integer
+                  chains:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        chainId:
+                          type: string
+                        name:
+                          type: string
+  /v1/chains/{chainId}/tokens:
+    get:
+      tags:
+        - Chains
+      summary: List tokens on chain
+      description: Returns a paginated list of tokens available on the specified chain. Supports `search`, `limit`, and `offset` query filters.
+      operationId: getTokens
+      parameters:
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      limit:
+                        type: integer
+                      offset:
+                        type: integer
+                  total:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        address:
+                          type: string
+                        symbol:
+                          type: string
+                        name:
+                          type: string
+                        decimals:
+                          type: integer
+
+  /v1/chains/{chainId}/adapters:
+    get:
+      tags:
+        - Chains
+      summary: List adapters on chain
+      description: Returns a list of adapters (DEX adapters) registered for the specified chain.
+      operationId: getAdapters
+      parameters:
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                  total:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        chain_id:
+                          type: string
+                        adapter_name:
+                          type: string
+                        max_rpc_per_min:
+                          type: integer
+                        fee_per_call:
+                          anyOf:
+                            - type: number
+                            - type: string
+                        priority:
+                          type: integer
+                        metadata:
+                          type: object
+                        created_at:
+                          type: string
+                          format: date-time

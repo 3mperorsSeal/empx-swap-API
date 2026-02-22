@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+dist
+logs
+.env
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+tests
+jest.config.cjs
+tsconfig.json

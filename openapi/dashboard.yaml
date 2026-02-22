@@ -1,0 +1,319 @@
+paths:
+  /v1/keys:
+    get:
+      tags:
+        - Dashboard
+      summary: List API keys (paginated)
+      operationId: listKeys
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: perPage
+          schema:
+            type: integer
+        - in: query
+          name: userId
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated keys
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeysList"
+              examples:
+                sample:
+                  summary: Paginated keys example
+                  value:
+                    total: 1
+                    rows:
+                      - id: 2
+                        key_prefix: "bdb24981"
+                        tier: "pro"
+                        revoked: false
+                        whitelisted_ips: ["192.168.0.1"]
+                        whitelisted_domains: ["example.com"]
+                        user_id: 1
+                        created_at: "2026-01-14T00:00:00Z"
+
+    post:
+      tags:
+        - Dashboard
+      summary: Create API key for logged-in user
+      operationId: createKey
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tier:
+                  type: string
+      responses:
+        "200":
+          description: Created key (raw key returned once)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  prefix:
+                    type: string
+              examples:
+                created:
+                  summary: New API key returned
+                  value:
+                    key: "bdb249817fa24149aae322077a0eefb2mkd0s9tf"
+                    prefix: "bdb24981"
+
+  /v1/keys/revoke:
+    post:
+      tags:
+        - Dashboard
+      summary: Revoke key by prefix
+      operationId: revokeKey
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./auth.yaml#/components/schemas/RevokeKeyRequest"
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              examples:
+                ok:
+                  summary: revoke result
+                  value:
+                    ok: true
+
+  /v1/keys/{prefix}/whitelist:
+    patch:
+      tags:
+        - Dashboard
+      summary: Update whitelist for a key
+      operationId: patchWhitelist
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: prefix
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhitelistPatchRequest"
+      responses:
+        "200":
+          description: Updated key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeyItem"
+              examples:
+                updated:
+                  summary: Updated key example
+                  value:
+                    id: 2
+                    key_prefix: "bdb24981"
+                    tier: "pro"
+                    revoked: false
+                    whitelisted_ips: ["192.168.0.1"]
+                    whitelisted_domains: ["example.com"]
+                    user_id: 1
+                    created_at: "2026-01-14T00:00:00Z"
+
+  /v1/keys/{prefix}/usage:
+    get:
+      tags:
+        - Dashboard
+      summary: Usage analytics for a key (by day)
+      operationId: getUsage
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: prefix
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: start
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Usage stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageResponse"
+              examples:
+                sample:
+                  summary: Usage by day
+                  value:
+                    apiKey:
+                      id: 2
+                      prefix: "bdb24981"
+                    stats:
+                      - day: "2026-01-13"
+                        requests: 10
+                        cost: 10
+                      - day: "2026-01-12"
+                        requests: 4
+                        cost: 4
+
+components:
+  schemas:
+    KeyItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        key_prefix:
+          type: string
+        tier:
+          type: string
+        revoked:
+          type: boolean
+        whitelisted_ips:
+          type: array
+          items:
+            type: string
+        whitelisted_domains:
+          type: array
+          items:
+            type: string
+        user_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      example:
+        id: 2
+        key_prefix: "bdb24981"
+        tier: "pro"
+        revoked: false
+        whitelisted_ips: ["192.168.0.1"]
+        whitelisted_domains: ["example.com"]
+        user_id: 1
+        created_at: "2026-01-14T00:00:00Z"
+
+    KeysList:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            total:
+              type: integer
+            page:
+              type: integer
+            perPage:
+              type: integer
+
+        total:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/KeyItem"
+      example:
+        total: 1
+        rows:
+          - id: 2
+            key_prefix: "bdb24981"
+            tier: "pro"
+            revoked: false
+            whitelisted_ips: ["192.168.0.1"]
+            whitelisted_domains: ["example.com"]
+            user_id: 1
+            created_at: "2026-01-14T00:00:00Z"
+
+    WhitelistPatchRequest:
+      type: object
+      properties:
+        whitelisted_ips:
+          type: array
+          items:
+            type: string
+        whitelisted_domains:
+          type: array
+          items:
+            type: string
+      example:
+        whitelisted_ips: ["192.168.0.1"]
+        whitelisted_domains: ["example.com"]
+
+    UsageBucket:
+      type: object
+      properties:
+        day:
+          type: string
+          format: date
+        requests:
+          type: integer
+        cost:
+          type: integer
+      example:
+        day: "2026-01-13"
+        requests: 10
+        cost: 10
+
+    UsageResponse:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            limit:
+              type: integer
+
+        apiKey:
+          type: object
+          properties:
+            id:
+              type: integer
+            prefix:
+              type: string
+        stats:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageBucket"
+      example:
+        apiKey:
+          id: 2
+          prefix: "bdb24981"
+        stats:
+          - day: "2026-01-13"
+            requests: 10
+            cost: 10

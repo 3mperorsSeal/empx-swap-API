@@ -1,0 +1,53 @@
+paths:
+  /v1/swap/{chainId}/build:
+    post:
+      tags:
+        - Swap
+      summary: Build swap transaction
+      description: Build an unsigned swap transaction payload (and approval tx if needed) for the requested `sellToken` -> `buyToken` and `sellAmount`. Returns `tx` object ready for signing and submission.
+      operationId: swapBuild
+      parameters:
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwapBuildRequest"
+            example:
+              sellToken: "ETH"
+              buyToken: "DAI"
+              sellAmount: "500000000000000000"
+              recipient: "0x0123456789abcdef0123456789abcdef01234567"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  tx:
+                    type: object
+
+components:
+  schemas:
+    SwapBuildRequest:
+      type: object
+      properties:
+        sellToken:
+          type: string
+        buyToken:
+          type: string
+        sellAmount:
+          type: string
+        recipient:
+          type: string
+      required: ["sellToken", "buyToken", "sellAmount"]
+      additionalProperties: false

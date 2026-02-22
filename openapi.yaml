@@ -1,0 +1,294 @@
+openapi: 3.0.0
+info:
+  title: DEX Aggregator API
+  description: |
+
+    A fast, multi-chain DEX aggregation service that finds and builds swap
+    routes across leading liquidity sources. Use this API to get price
+    quotations, compare routing strategies, and build transactions ready to
+    sign and broadcast.
+
+    ## Authentication
+
+    - Include your API key in the `X-API-KEY` header for most production
+      endpoints.
+    - Example: `X-API-KEY: sk_live_your_key_here`
+
+    Get or manage API keys in the dashboard: https://yourdex.com/dashboard
+
+    ## Rate limits
+
+    - Free: 100 requests / minute
+    - Developer: 1,000 requests / minute
+    - Pro: 10,000 requests / minute
+    - Enterprise: contact sales for custom limits
+
+    ## Routing strategies
+
+    Choose the tradeoff between speed and price:
+
+    - `fast` (noSplit) — Single-path route focused on lowest latency.
+    - `split` — Split trade across multiple pools/protocols to improve price.
+    - `converge` — Two-stage routing for very large trades to reduce impact.
+    - `auto` — Let the system choose the best strategy for the request.
+
+    ## Quick links
+
+    - Swagger UI (interactive docs): `/api-docs`
+    - Raw spec (YAML): `/openapi.yaml`
+    - Raw spec (JSON): `/openapi.json`
+
+    ## Tips
+
+    - Use `timeout` on the `/quote/best` endpoint when querying many
+      strategies to bound compute time.
+    - Include a `recipient` for swap builds to construct final calldata.
+  version: "1.0.0"
+  contact:
+    name: API Support
+    email: support@yourdex.com
+    url: https://yourdex.com/support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://yourdex.com/terms
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://api.yourdex.com/v1
+    description: Production server
+  - url: https://api-staging.yourdex.com/v1
+    description: Staging server
+tags:
+  - name: Chains
+    description: Chain and token discovery
+  - name: Quotes
+    description: Quote endpoints (fast, best, batch)
+  - name: Swap
+    description: Swap transaction building endpoints
+  - name: Auth
+    description: Authentication and API key management
+  - name: Users
+    description: User registration and session endpoints
+  - name: Dashboard
+    description: Admin/dashboard endpoints for API key management and analytics
+  - name: Partners
+    description: Dashboard partners management endpoints
+  - name: System
+    description: Health, status, and protected test routes
+security:
+  - ApiKeyAuth: []
+paths:
+  /status:
+    $ref: "./openapi/misc.yaml#/paths/~1status"
+  /protected:
+    $ref: "./openapi/misc.yaml#/paths/~1protected"
+  /v1/chains:
+    $ref: "./openapi/chains.yaml#/paths/~1v1~1chains"
+  /v1/chains/{chainId}/tokens:
+    $ref: "./openapi/chains.yaml#/paths/~1v1~1chains~1{chainId}~1tokens"
+  /v1/chains/{chainId}/adapters:
+    $ref: "./openapi/chains.yaml#/paths/~1v1~1chains~1{chainId}~1adapters"
+  /v1/quotes/{chainId}/fast:
+    $ref: "./openapi/quotes.yaml#/paths/~1v1~1quotes~1{chainId}~1fast"
+  /v1/quotes/{chainId}/best:
+    $ref: "./openapi/quotes.yaml#/paths/~1v1~1quotes~1{chainId}~1best"
+  /v1/quotes/{chainId}/batch:
+    $ref: "./openapi/quotes.yaml#/paths/~1v1~1quotes~1{chainId}~1batch"
+  /v1/swap/{chainId}/build:
+    $ref: "./openapi/swap.yaml#/paths/~1v1~1swap~1{chainId}~1build"
+  /v1/auth/generate:
+    $ref: "./openapi/auth.yaml#/paths/~1v1~1auth~1generate"
+  /v1/auth/revoke:
+    $ref: "./openapi/auth.yaml#/paths/~1v1~1auth~1revoke"
+  /v1/auth/me:
+    $ref: "./openapi/auth.yaml#/paths/~1v1~1auth~1me"
+  /v1/auth/user/register:
+    $ref: "./openapi/user.yaml#/paths/~1v1~1auth~1user~1register"
+  /v1/auth/user/login:
+    $ref: "./openapi/user.yaml#/paths/~1v1~1auth~1user~1login"
+  /v1/auth/user/me:
+    $ref: "./openapi/user.yaml#/paths/~1v1~1auth~1user~1me"
+  /v1/keys:
+    $ref: "./openapi/dashboard.yaml#/paths/~1v1~1keys"
+  /v1/keys/revoke:
+    $ref: "./openapi/dashboard.yaml#/paths/~1v1~1keys~1revoke"
+  /v1/keys/{prefix}/whitelist:
+    $ref: "./openapi/dashboard.yaml#/paths/~1v1~1keys~1{prefix}~1whitelist"
+  /v1/keys/{prefix}/usage:
+    $ref: "./openapi/dashboard.yaml#/paths/~1v1~1keys~1{prefix}~1usage"
+  /v1/admin/seed:
+    $ref: "./openapi/admin.yaml#/paths/~1v1~1admin~1seed"
+  /v1/partners:
+    $ref: "./openapi/partners.yaml#/paths/~1v1~1partners"
+  /v1/partners/{id}:
+    $ref: "./openapi/partners.yaml#/paths/~1v1~1partners~1{id}"
+  /v1/billing/purchase:
+    $ref: "./openapi/billing.yaml#/paths/~1v1~1billing~1purchase"
+  /v1/billing/usage:
+    $ref: "./openapi/billing.yaml#/paths/~1v1~1billing~1usage"
+  /metrics:
+    get:
+      tags:
+        - System
+      summary: Prometheus metrics
+      description: Exposes Prometheus metrics for monitoring.
+      responses:
+        "200":
+          description: Prometheus metrics text/plain
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/test:
+    get:
+      tags:
+        - System
+      summary: API key test endpoint
+      description: Returns a simple success message when a valid API key is provided.
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+  /openapi.json:
+    get:
+      tags:
+        - System
+      summary: Raw OpenAPI JSON
+      description: Returns the raw OpenAPI specification in JSON format.
+      responses:
+        "200":
+          description: OpenAPI JSON
+          content:
+            application/json:
+              schema:
+                type: object
+  /openapi.yaml:
+    get:
+      tags:
+        - System
+      summary: Raw OpenAPI YAML
+      description: Returns the raw OpenAPI specification in YAML format.
+      responses:
+        "200":
+          description: OpenAPI YAML
+          content:
+            text/yaml:
+              schema:
+                type: string
+  /api-docs:
+    get:
+      tags:
+        - System
+      summary: Swagger UI
+      description: Interactive API documentation (Swagger UI).
+      responses:
+        "200":
+          description: HTML Swagger UI
+          content:
+            text/html:
+              schema:
+                type: string
+  /docs:
+    get:
+      tags:
+        - System
+      summary: Docs redirect
+      description: Redirects to the interactive Swagger UI at `/api-docs`.
+      responses:
+        "302":
+          description: Redirect to /api-docs
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    GenerateKeyRequest:
+      type: object
+      properties:
+        userId:
+          anyOf:
+            - type: number
+            - type: "null"
+        tier:
+          type: string
+        persist:
+          type: boolean
+      additionalProperties: false
+      example:
+        userId: 123
+        tier: "test"
+        persist: true
+    RevokeKeyRequest:
+      type: object
+      properties:
+        prefix:
+          type: string
+      required: ["prefix"]
+      additionalProperties: false
+      example:
+        prefix: "test_"
+    QuoteItem:
+      type: object
+      properties:
+        sellToken:
+          type: string
+        buyToken:
+          type: string
+        sellAmount:
+          type: string
+      required: ["sellToken", "buyToken", "sellAmount"]
+      additionalProperties: false
+      example:
+        sellToken: "ETH"
+        buyToken: "USDC"
+        sellAmount: "1000000000000000000"
+    QuoteBatchRequest:
+      type: object
+      properties:
+        quotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteItem"
+      required: ["quotes"]
+      additionalProperties: false
+      example:
+        quotes:
+          - sellToken: "ETH"
+            buyToken: "USDC"
+            sellAmount: "1000000000000000000"
+          - sellToken: "DAI"
+            buyToken: "USDC"
+            sellAmount: "1000000"
+    SwapBuildRequest:
+      type: object
+      properties:
+        sellToken:
+          type: string
+        buyToken:
+          type: string
+        sellAmount:
+          type: string
+        recipient:
+          type: string
+      required: ["sellToken", "buyToken", "sellAmount"]
+      additionalProperties: false
+      example:
+        sellToken: "ETH"
+        buyToken: "DAI"
+        sellAmount: "500000000000000000"
+        recipient: "0x0123456789abcdef0123456789abcdef01234567"

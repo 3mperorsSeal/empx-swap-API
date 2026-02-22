@@ -1,0 +1,82 @@
+paths:
+  /v1/auth/generate:
+    post:
+      tags:
+        - Auth
+      summary: Generate API key
+      description: Generate a new API key. Set `persist` to true to store the key in the database (otherwise returned key is ephemeral).
+      operationId: generateKey
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateKeyRequest"
+            example:
+              userId: 123
+              tier: "test"
+              persist: true
+      responses:
+        "200":
+          description: OK
+
+  /v1/auth/revoke:
+    post:
+      tags:
+        - Auth
+      summary: Revoke API key
+      description: Revoke API keys matching the provided `prefix`. Requires authentication with a valid API key.
+      operationId: revokeKey
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevokeKeyRequest"
+            example:
+              prefix: "test_"
+      responses:
+        "200":
+          description: OK
+
+  /v1/auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Current API key
+      description: Return the currently authenticated API key details (attached by `authMiddleware`).
+      operationId: me
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: OK
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+  schemas:
+    GenerateKeyRequest:
+      type: object
+      properties:
+        userId:
+          anyOf:
+            - type: number
+            - type: "null"
+        tier:
+          type: string
+        persist:
+          type: boolean
+      additionalProperties: false
+    RevokeKeyRequest:
+      type: object
+      properties:
+        prefix:
+          type: string
+      required: ["prefix"]
+      additionalProperties: false

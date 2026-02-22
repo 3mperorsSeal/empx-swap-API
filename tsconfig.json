@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "CommonJS",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "lib": ["ESNext", "DOM"]
+  },
+  "typeRoots": ["./src/types", "./node_modules/@types"],
+  "include": ["src/**/*", "generated/**/*"]
+}

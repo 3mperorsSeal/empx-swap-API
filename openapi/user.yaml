@@ -1,0 +1,151 @@
+paths:
+  /v1/auth/user/register:
+    post:
+      tags:
+        - Users
+      summary: Register user
+      operationId: userRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "200":
+          description: Registered user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+              examples:
+                success:
+                  summary: Newly created user
+                  value:
+                    user:
+                      id: 10
+                      email: "alice@example.com"
+                      name: "Alice"
+                      role: "user"
+
+  /v1/auth/user/login:
+    post:
+      tags:
+        - Users
+      summary: Login user and return JWT
+      operationId: userLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+              examples:
+                success:
+                  summary: Example login response
+                  value:
+                    token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    user:
+                      id: 10
+                      email: "alice@example.com"
+                      name: "Alice"
+                      role: "user"
+
+  /v1/auth/user/me:
+    get:
+      tags:
+        - Users
+      summary: Current logged-in user
+      operationId: userMe
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+              examples:
+                me:
+                  summary: Current user
+                  value:
+                    user:
+                      id: 10
+                      email: "alice@example.com"
+                      name: "Alice"
+                      role: "user"
+
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+      required: ["email", "password"]
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: ["email", "password"]
+      example:
+        email: "alice@example.com"
+        password: "s3cretP@ss"
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      example:
+        token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          id: 10
+          email: "alice@example.com"
+          name: "Alice"
+          role: "user"
+    UserResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+      example:
+        user:
+          id: 10
+          email: "alice@example.com"
+          name: "Alice"
+          role: "user"
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+      example:
+        id: 10
+        email: "alice@example.com"
+        name: "Alice"
+        role: "user"

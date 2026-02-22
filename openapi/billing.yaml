@@ -1,0 +1,54 @@
+paths:
+  /v1/billing/purchase:
+    post:
+      tags:
+        - Billing
+      summary: Purchase extra monthly credits (test shim)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        description: Credits to purchase (optional)
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                credits:
+                  type: integer
+      responses:
+        "200":
+          description: Credits granted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  creditsGranted:
+                    type: integer
+  /v1/billing/usage:
+    get:
+      tags:
+        - Billing
+      summary: Get remaining paid and free quota
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Usage info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  usage:
+                    type: object
+                    properties:
+                      remainingPaid:
+                        type: integer
+                      remainingFree:
+                        type: integer

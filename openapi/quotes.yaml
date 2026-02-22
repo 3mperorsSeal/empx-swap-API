@@ -1,0 +1,151 @@
+paths:
+  /v1/quotes/{chainId}/fast:
+    get:
+      tags:
+        - Quotes
+      summary: Fast quote
+      description: Return a quick price estimate for swapping `sellToken` -> `buyToken` on the given chain. Optimized for speed and low latency.
+      operationId: quoteFast
+      parameters:
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: sellToken
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: buyToken
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: sellAmount
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  strategy:
+                    type: string
+                  quote:
+                    type: object
+
+  /v1/quotes/{chainId}/best:
+    get:
+      tags:
+        - Quotes
+      summary: Best quote (strategy)
+      description: Compute the best quote for a swap using the selected `strategy` (or default). Supports an optional `timeout` to limit search duration.
+      operationId: quoteBest
+      parameters:
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: sellToken
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: buyToken
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: sellAmount
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: strategy
+          in: query
+          schema:
+            type: string
+        - name: timeout
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  strategy:
+                    type: string
+                  quote:
+                    type: object
+
+  /v1/quotes/{chainId}/batch:
+    post:
+      tags:
+        - Quotes
+      summary: Batch quotes
+      description: Accepts an array of quote requests and returns estimates for each. Useful to request multiple quotes in a single call.
+      operationId: quoteBatch
+      parameters:
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteBatchRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      type: object
+
+components:
+  schemas:
+    QuoteItem:
+      type: object
+      properties:
+        sellToken:
+          type: string
+        buyToken:
+          type: string
+        sellAmount:
+          type: string
+      required: ["sellToken", "buyToken", "sellAmount"]
+      additionalProperties: false
+    QuoteBatchRequest:
+      type: object
+      properties:
+        quotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteItem"
+      required: ["quotes"]
+      additionalProperties: false

@@ -1,0 +1,34 @@
+paths:
+  /status:
+    get:
+      tags:
+        - System
+      summary: Service status
+      description: Lightweight health endpoint returning service status and uptime.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+  /protected:
+    get:
+      tags:
+        - System
+      summary: Protected test route
+      description: Example protected endpoint that requires a valid API key and is subject to rate limiting.
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: OK
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
