@@ -9,7 +9,7 @@ import {
   createHop,
   createTrade,
 } from "./contracts/types";
-import logger from "./logger";
+import logger from "../core/logger";
 
 export type Strategy = "fast" | "best" | "split" | "nosplit" | "converge";
 

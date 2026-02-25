@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import "dotenv/config";
 import logger from "../core/logger";
 import prisma from "../lib/prisma";
@@ -334,13 +335,39 @@ async function main() {
   try {
     const userId = await ensureAdminUser();
 
-    const { key, prefix, hash } = await generateApiKey();
-    const r = await storeApiKey(prefix, hash, userId, "pro");
-    if (!r) {
-      logger.error("seed.api_store_failed", { prefix });
+    const testKey = process.env.TEST_KEY?.trim();
+    const seededKey = testKey || (await generateApiKey()).key;
+    const prefix = seededKey.substring(0, 8);
+    const hash = crypto.createHash("sha256").update(seededKey).digest("hex");
+
+    let apiRecord;
+    if (testKey) {
+      apiRecord = await prisma.api_keys.upsert({
+        where: { key_prefix: prefix },
+        update: {
+          key_hash: hash,
+          user_id: userId,
+          tier: "pro",
+          revoked: false,
+        },
+        create: {
+          key_prefix: prefix,
+          key_hash: hash,
+          user_id: userId,
+          tier: "pro",
+          revoked: false,
+        },
+      });
+      logger.info("seed.api_from_env", { prefix, id: apiRecord.id });
+      console.log("RAW KEY (from .env TEST_KEY):", seededKey);
     } else {
-      logger.info("seed.api_created", { prefix, id: r.id });
-      console.log("RAW KEY (store securely, shown only once):", key);
+      apiRecord = await storeApiKey(prefix, hash, userId, "pro");
+      if (!apiRecord) {
+        logger.error("seed.api_store_failed", { prefix });
+      } else {
+        logger.info("seed.api_created", { prefix, id: apiRecord.id });
+        console.log("RAW KEY (store securely, shown only once):", seededKey);
+      }
     }
 
     const tiers = await ensureTiers();

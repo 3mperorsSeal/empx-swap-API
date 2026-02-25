@@ -13,9 +13,9 @@ import {
   PublicClient,
 } from "viem";
 import { mainnet, polygon } from "viem/chains";
-import logger from "../logger";
 import { ADAPTER_ABI, EMPSEAL_ROUTER_ABI, ERC20_ABI } from "./abis";
 import { getChainConfig, hasRealContracts } from "./config";
+import logger from "../../core/logger";
 
 // Define PulseChain since it's not in viem's default chains
 const pulsechain = {

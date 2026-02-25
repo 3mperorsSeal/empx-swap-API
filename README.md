@@ -12,12 +12,8 @@ A modular TypeScript + Express API for quote estimation and swap transaction bui
 
 - [Key features](#key-features)
 - [Quick start](#quick-start)
-- [Environment](#environment)
-- [Scripts](#scripts)
 - [Blockchain layer notes](#blockchain-layer-notes)
-- [Deployment](#deployment)
 - [Operational checklist](#operational-checklist)
-- [Contributing](#contributing)
 - [Maintainer & License](#maintainer--license)
 
 ---
@@ -32,84 +28,58 @@ A modular TypeScript + Express API for quote estimation and swap transaction bui
 
 ## Quick start
 
-1. Install dependencies
+1. Start core services (Postgres + Redis)
+
+```bash
+docker-compose up -d
+```
+
+2. Create `.env` from `.env.example`
+
+```bash
+cp .env.example .env
+```
+
+> On Windows PowerShell, use:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+3. Install dependencies
 
 ```bash
 npm install
 ```
 
-2. Start in development (hot reload)
+4. Run development migrations
+
+```bash
+npm run migrate:dev
+```
+
+5. Seed development data
+
+```bash
+npm run seed
+```
+
+6. Start in development (hot reload)
 
 ```bash
 npm run start:dev
 ```
 
-3. Useful endpoints
+7. Open Swagger docs and test endpoints
 
 - Swagger UI: http://localhost:3000/docs
 - Health: http://localhost:3000/status
-
-## Environment
-
-Required environment variables:
-
-- `DATABASE_URL` — Postgres connection string
-- `REDIS_URL` — Redis connection string (for rate limiter)
-- `JWT_SECRET` — JWT signing secret
-- `DASHBOARD_SECRET` — dashboard admin secret
-- `TEST_KEY` — optional: development API key
-- RPC endpoints (for real adapters): `ETHEREUM_RPC_URL`, `PULSECHAIN_RPC_URL`, `POLYGON_RPC_URL`, etc.
-
-## Scripts
-
-Run common tasks with npm:
-
-```bash
-# development
-npm run start:dev
-
-# build and production
-npm run build
-npm run start:prod
-
-# tests
-npm run test
-
-# prisma
-npm run prisma:generate
-npm run prisma:studio
-npm run migrate
-
-# seed and worker
-npm run seed
-npm run worker
-```
+- In Swagger, click **Authorize** and paste your `.env` `TEST_KEY` to call protected endpoints.
 
 ## Blockchain layer notes
 
-- The SmartRouter supports two modes:
-  - Mock fallback: used when RPCs/contracts are not configured (local dev / tests).
-  - Real mode: enabled when `src/lib/contracts/config.ts` contains valid RPC URLs and adapter contract addresses.
-- To enable on-chain routing in production, configure RPC URLs and seed adapter entries in the DB or implement adapter discovery.
-
-## Deployment
-
-Recommended CI/CD steps:
-
-```bash
-# install deps
-npm ci
-
-# generate prisma client
-npm run prisma:generate
-
-# apply migrations (run in staging/production as appropriate)
-npm run migrate
-
-# build and start
-npm run build
-npm run start:prod
-```
+- Not Implemented, uses mock data.
+- Will be added once Ganadesh finalizes and guides me on what to integrate in our API
 
 ## Operational checklist
 
@@ -117,12 +87,6 @@ npm run start:prod
 - Ensure DB and Redis credentials are stored securely in your secret manager.
 - Schedule a migration rehearsal for staging; ensure `prisma migrate` fits your production strategy.
 - Add integration tests that exercise quoting and swap flows using a testnet RPC or mocked `publicClient`.
-
-## Contributing
-
-- Run unit tests: `npm run test`
-- Format code: `npm run format`
-- Open a PR with clear description and update `docs/PHASE1_ANALYSIS_REPORT.md` if you change architecture or risk areas.
 
 ## Maintainer & License
 
