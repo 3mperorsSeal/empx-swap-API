@@ -5,10 +5,10 @@ declare global {
     interface Request {
       requestId?: string;
       apiKey?: {
-        id: string;
+        id: number;
         key_prefix: string;
         tier: string;
-        user_id: string;
+        user_id: number | null;
       };
       user?: {
         id: string;
