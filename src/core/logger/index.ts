@@ -33,12 +33,19 @@ transports.push(
   }) as any,
 );
 
+// In production pipe console output as JSON (matches file format).
+// In development keep human-readable coloured output.
+const consoleFormat =
+  envName === "production"
+    ? jsonFormat
+    : winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple(),
+      );
+
 transports.push(
   new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple(),
-    ),
+    format: consoleFormat,
     level,
   }),
 );
