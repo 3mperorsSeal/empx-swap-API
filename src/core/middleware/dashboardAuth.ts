@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { NextFunction, Request, Response } from "express";
 
 // Simple dashboard auth: expects `Authorization: Bearer <secret>`
 // The secret is provided via DASHBOARD_SECRET env var. This keeps the
