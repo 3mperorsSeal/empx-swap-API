@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   postgres:
     image: postgres:15
@@ -23,12 +22,17 @@ services:
       - dex-aggregator
 
   # backend:
-  #   build: ./backend
+  #   build: .
   #   restart: unless-stopped
+  #   env_file:
+  #     - .env                          # picks up all vars from .env automatically
   #   environment:
-  #     - PORT=3000
+  #     # Override host-specific values for container networking:
   #     - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/dexdb
   #     - REDIS_URL=redis://redis:6379
+  #     - PORT=3000
+  #     # Metrics / performance (sourced from .env via env_file above):
+  #     # METRICS_TOKEN and SLOW_REQUEST_MS are forwarded automatically.
   #   ports:
   #     - "3000:3000"
   #   depends_on:
@@ -45,8 +49,53 @@ services:
     networks:
       - dex-aggregator
 
+  # ---------------------------------------------------------------------------
+  # Observability stack
+  # ---------------------------------------------------------------------------
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle" # allows hot-reload via POST /-/reload
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - dex-aggregator
+    extra_hosts:
+      # Lets Prometheus reach the API running on the host machine (dev mode)
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/api_overview.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - dex-aggregator
+
 volumes:
   pgdata:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:

@@ -1,0 +1,569 @@
+{
+  "title": "DEX Tier & Pricing Configuration",
+  "uid": "dex-tier-config",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "time": { "from": "now-30d", "to": "now" },
+  "tags": ["tier", "pricing", "billing", "config"],
+  "templating": {
+    "list": [
+      {
+        "name": "tier",
+        "label": "Tier",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "query": "SELECT name FROM tiers ORDER BY name",
+        "refresh": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {},
+        "sort": 0,
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Tier Configuration Summary",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total Tiers",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "blue", "mode": "fixed" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS value FROM tiers",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Configured Endpoints",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "green", "mode": "fixed" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT COUNT(DISTINCT endpoint_id) AS value FROM tier_endpoint_configs",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Total API Keys",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "purple", "mode": "fixed" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS value FROM api_keys WHERE revoked = false OR revoked IS NULL",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Highest Price/Request",
+      "description": "Maximum price_per_request across all tier-endpoint configs",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 8,
+          "color": { "fixedColor": "orange", "mode": "fixed" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT MAX(price_per_request)::float AS value FROM tier_endpoint_configs",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Tiers Overview",
+      "description": "All tiers with descriptions and feature sets",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 5 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "features" },
+            "properties": [{ "id": "custom.width", "value": 500 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "name" },
+            "properties": [{ "id": "custom.width", "value": 120 }]
+          }
+        ]
+      },
+      "options": { "sortBy": [{ "displayName": "id", "desc": false }] },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  t.id,\n  t.name,\n  t.description,\n  t.features::text AS features,\n  COUNT(tec.id) AS endpoint_count,\n  MAX(tec.rate_limit) AS max_rate_limit,\n  MAX(tec.quota) AS max_quota,\n  MAX(tec.price_per_request)::float AS max_price,\n  t.created_at\nFROM tiers t\nLEFT JOIN tier_endpoint_configs tec ON tec.tier_id = t.id\nGROUP BY t.id, t.name, t.description, t.features, t.created_at\nORDER BY t.id",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Pricing Matrix",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Tier × Endpoint Pricing Matrix",
+      "description": "Full configuration: rate_limit (req/min), quota (req/month), price_per_request",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "price_per_request" },
+            "properties": [
+              { "id": "unit", "value": "currencyUSD" },
+              { "id": "decimals", "value": 8 },
+              { "id": "custom.width", "value": 160 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 0.00001 },
+                    { "color": "red", "value": 0.0001 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-text" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "rate_limit" },
+            "properties": [{ "id": "custom.width", "value": 120 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "quota" },
+            "properties": [{ "id": "custom.width", "value": 120 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "tier_name" },
+            "properties": [{ "id": "custom.width", "value": 100 }]
+          }
+        ]
+      },
+      "options": { "sortBy": [{ "displayName": "tier_name", "desc": false }] },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  t.name AS tier_name,\n  e.path AS endpoint_path,\n  e.method,\n  tec.rate_limit,\n  tec.quota,\n  tec.price_per_request::float AS price_per_request\nFROM tier_endpoint_configs tec\nJOIN tiers t ON t.id = tec.tier_id\nJOIN endpoints e ON e.id = tec.endpoint_id\nORDER BY t.name, e.path, e.method",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "row",
+      "title": "API Key Distribution by Tier",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 }
+    },
+    {
+      "id": 10,
+      "type": "piechart",
+      "title": "Active API Keys by Tier",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "pieType": "donut",
+        "legend": { "displayMode": "list", "placement": "right" }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT tier, COUNT(*) AS keys FROM api_keys WHERE revoked = false OR revoked IS NULL GROUP BY tier ORDER BY keys DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "API Keys per Tier (Active vs Revoked)",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  tier,\n  COUNT(*) FILTER (WHERE revoked = false OR revoked IS NULL) AS active,\n  COUNT(*) FILTER (WHERE revoked = true)                    AS revoked\nFROM api_keys\nGROUP BY tier\nORDER BY active DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Tier Adoption Details",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "revoke_rate_pct" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 10 },
+                    { "color": "red", "value": 30 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background" }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  ak.tier,\n  COUNT(*) AS total_keys,\n  COUNT(*) FILTER (WHERE revoked = false OR revoked IS NULL) AS active_keys,\n  ROUND(100.0 * COUNT(*) FILTER (WHERE revoked = true) / NULLIF(COUNT(*), 0), 1) AS revoke_rate_pct,\n  MIN(ak.created_at) AS first_key_at,\n  MAX(ak.created_at) AS latest_key_at\nFROM api_keys ak\nGROUP BY ak.tier\nORDER BY total_keys DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "row",
+      "title": "Tier Usage Analysis",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "API Calls Over Time by Tier",
+      "description": "Requires api_usage_logs → api_keys join on tier",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 32 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "time_series",
+          "rawSql": "SELECT\n  $__timeGroupAlias(ul.created_at,$__interval,'none'),\n  ak.tier,\n  COUNT(*) AS calls\nFROM api_usage_logs ul\nJOIN api_keys ak ON ak.id = ul.api_key_id\nWHERE $__timeFilter(ul.created_at)\n  AND ak.tier IN (\n    SELECT DISTINCT tier FROM api_keys\n  )\nGROUP BY 1, ak.tier\nORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "bargauge",
+      "title": "Total Calls by Tier (Period)",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  ak.tier,\n  COUNT(*) AS calls\nFROM api_usage_logs ul\nJOIN api_keys ak ON ak.id = ul.api_key_id\nWHERE $__timeFilter(ul.created_at)\nGROUP BY ak.tier\nORDER BY calls DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Error Rate by Tier",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": { "lineWidth": 2, "fillOpacity": 5 },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "time_series",
+          "rawSql": "SELECT\n  $__timeGroupAlias(ul.created_at,$__interval,'none'),\n  ak.tier,\n  ROUND(100.0 * COUNT(*) FILTER (WHERE ul.status >= 400) / NULLIF(COUNT(*), 0), 2) AS error_rate\nFROM api_usage_logs ul\nJOIN api_keys ak ON ak.id = ul.api_key_id\nWHERE $__timeFilter(ul.created_at)\nGROUP BY 1, ak.tier\nORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "table",
+      "title": "Monthly Credits Consumed by Tier",
+      "description": "Sum of used_credits from api_usage_quotas_monthly per tier, current month",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "utilisation_pct" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 70 },
+                    { "color": "red", "value": 90 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background" }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  ak.tier,\n  SUM(q.purchased_credits) AS total_purchased,\n  SUM(q.used_credits) AS total_used,\n  ROUND(100.0 * SUM(q.used_credits) / NULLIF(SUM(q.purchased_credits), 0), 1) AS utilisation_pct\nFROM api_usage_quotas_monthly q\nJOIN api_keys ak ON ak.id = q.api_key_id\nWHERE q.year = EXTRACT(YEAR FROM NOW())\n  AND q.month = EXTRACT(MONTH FROM NOW())\nGROUP BY ak.tier\nORDER BY total_used DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "New Key Registrations",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 48 }
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "New API Keys Registered Over Time by Tier",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 49 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "drawStyle": "bars", "fillOpacity": 60 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "time_series",
+          "rawSql": "SELECT\n  $__timeGroupAlias(created_at,'1d','none'),\n  tier,\n  COUNT(*) AS new_keys\nFROM api_keys\nWHERE $__timeFilter(created_at)\nGROUP BY 1, tier\nORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

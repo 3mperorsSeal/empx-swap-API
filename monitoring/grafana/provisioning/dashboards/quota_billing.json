@@ -1,0 +1,542 @@
+{
+  "annotations": { "list": [] },
+  "description": "Monthly paid credits, daily free quota consumption, exhaustion status and tier breakdown",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "API Overview",
+      "type": "dashboard",
+      "url": "/d/dex-api-overview"
+    },
+    {
+      "title": "Partner Usage",
+      "type": "dashboard",
+      "url": "/d/dex-partner-usage"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 200,
+      "title": "This Month — Credit Summary",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          },
+          "unit": "short",
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "id": 201,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(purchased_credits), 0) AS value FROM api_usage_quotas_monthly WHERE year = EXTRACT(YEAR FROM NOW()) AND month = EXTRACT(MONTH FROM NOW())",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Purchased Credits",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "short",
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "id": 202,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(used_credits), 0) AS value FROM api_usage_quotas_monthly WHERE year = EXTRACT(YEAR FROM NOW()) AND month = EXTRACT(MONTH FROM NOW())",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Used Credits",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 20 },
+              { "color": "green", "value": 50 }
+            ]
+          },
+          "unit": "short",
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "id": 203,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(purchased_credits - used_credits), 0) AS value FROM api_usage_quotas_monthly WHERE year = EXTRACT(YEAR FROM NOW()) AND month = EXTRACT(MONTH FROM NOW())",
+          "refId": "A"
+        }
+      ],
+      "title": "Remaining Credits",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          },
+          "unit": "short",
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "id": 204,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM api_usage_quotas_monthly WHERE year = EXTRACT(YEAR FROM NOW()) AND month = EXTRACT(MONTH FROM NOW()) AND purchased_credits > 0 AND used_credits >= purchased_credits",
+          "refId": "A"
+        }
+      ],
+      "title": "Exhausted Keys This Month",
+      "type": "stat"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 210,
+      "title": "Monthly Paid Credit Status",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Used %" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.displayMode", "value": "color-background-solid" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 70 },
+                    { "color": "orange", "value": 85 },
+                    { "color": "red", "value": 100 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Status" },
+            "properties": [
+              { "id": "custom.displayMode", "value": "color-text" },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "OK": { "color": "green", "text": "✓ OK" },
+                      "Warning": { "color": "orange", "text": "⚠ Warning" },
+                      "Exhausted": { "color": "red", "text": "✗ Exhausted" }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Purchased" },
+            "properties": [
+              { "id": "custom.displayMode", "value": "color-background-solid" },
+              { "id": "color", "value": { "mode": "continuous-blues" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 6 },
+      "id": 211,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Used %" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  ak.key_prefix AS \"API Key\",\n  ak.tier AS \"Tier\",\n  q.purchased_credits AS \"Purchased\",\n  q.used_credits AS \"Used\",\n  GREATEST(q.purchased_credits - q.used_credits, 0) AS \"Remaining\",\n  ROUND(100.0 * q.used_credits / NULLIF(q.purchased_credits, 0), 1) AS \"Used %\",\n  CASE\n    WHEN q.used_credits >= q.purchased_credits THEN 'Exhausted'\n    WHEN ROUND(100.0 * q.used_credits / NULLIF(q.purchased_credits, 0), 0) >= 80 THEN 'Warning'\n    ELSE 'OK'\n  END AS \"Status\",\n  q.updated_at::text AS \"Last Updated\"\nFROM api_usage_quotas_monthly q\nJOIN api_keys ak ON ak.id = q.api_key_id\nWHERE q.year = EXTRACT(YEAR FROM NOW())\n  AND q.month = EXTRACT(MONTH FROM NOW())\nORDER BY \"Used %\" DESC NULLS LAST",
+          "refId": "A"
+        }
+      ],
+      "title": "Monthly Quota Status (Current Month)",
+      "type": "table"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 220,
+      "title": "Credit Consumption Trends",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 17 },
+      "id": 221,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum", "max"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  make_timestamp(q.year, q.month, 1, 0, 0, 0) AS \"time\",\n  ak.key_prefix AS metric,\n  q.used_credits AS value\nFROM api_usage_quotas_monthly q\nJOIN api_keys ak ON ak.id = q.api_key_id\nWHERE make_timestamp(q.year, q.month, 1, 0, 0, 0) >= $__timeFrom()::timestamp\n  AND make_timestamp(q.year, q.month, 1, 0, 0, 0) <= $__timeTo()::timestamp\nORDER BY 1",
+          "metricColumn": "metric",
+          "refId": "A"
+        }
+      ],
+      "title": "Monthly Credit Usage per API Key (Historical)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 17 },
+      "id": 222,
+      "options": {
+        "displayMode": "lcd",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "/^Used$/",
+          "values": false
+        },
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  ak.tier AS \"Tier\",\n  SUM(q.purchased_credits) AS \"Purchased\",\n  SUM(q.used_credits) AS \"Used\"\nFROM api_usage_quotas_monthly q\nJOIN api_keys ak ON ak.id = q.api_key_id\nWHERE q.year = EXTRACT(YEAR FROM NOW())\n  AND q.month = EXTRACT(MONTH FROM NOW())\nGROUP BY ak.tier\nORDER BY \"Used\" DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Used Credits by Tier (This Month)",
+      "type": "bargauge"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 230,
+      "title": "Daily Free Quota",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 26 },
+      "id": 231,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum", "max"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  d.date::timestamp AS \"time\",\n  COALESCE(ak.key_prefix, 'unknown') AS metric,\n  d.used_credits AS value\nFROM api_usage_quotas_daily d\nLEFT JOIN api_keys ak ON ak.id = d.api_key_id\nWHERE d.date >= $__timeFrom()::date\n  AND d.date <= $__timeTo()::date\nORDER BY 1",
+          "metricColumn": "metric",
+          "refId": "A"
+        }
+      ],
+      "title": "Daily Free Quota Usage per Key",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Used Today" },
+            "properties": [
+              { "id": "custom.displayMode", "value": "color-background-solid" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 50 },
+                    { "color": "red", "value": 100 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+      "id": 232,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Used Today" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COALESCE(ak.key_prefix, 'unknown') AS \"API Key\",\n  ak.tier AS \"Tier\",\n  d.used_credits AS \"Used Today\"\nFROM api_usage_quotas_daily d\nLEFT JOIN api_keys ak ON ak.id = d.api_key_id\nWHERE d.date = CURRENT_DATE\nORDER BY d.used_credits DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Today's Free Quota Usage",
+      "type": "table"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "id": 240,
+      "title": "Alerts — Keys Needing Attention",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Used %" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.displayMode", "value": "color-background-solid" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "orange", "value": null },
+                    { "color": "red", "value": 100 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
+      "id": 241,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Used %" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  ak.key_prefix AS \"API Key\",\n  ak.tier AS \"Tier\",\n  q.purchased_credits AS \"Purchased\",\n  q.used_credits AS \"Used\",\n  ROUND(100.0 * q.used_credits / NULLIF(q.purchased_credits, 0), 1) AS \"Used %\"\nFROM api_usage_quotas_monthly q\nJOIN api_keys ak ON ak.id = q.api_key_id\nWHERE q.year = EXTRACT(YEAR FROM NOW())\n  AND q.month = EXTRACT(MONTH FROM NOW())\n  AND q.purchased_credits > 0\n  AND ROUND(100.0 * q.used_credits / NULLIF(q.purchased_credits, 0), 0) >= 80\nORDER BY \"Used %\" DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "⚠ Keys ≥80% Monthly Quota Used",
+      "type": "table"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Days Since Use" },
+            "properties": [
+              { "id": "custom.displayMode", "value": "color-text" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 7 },
+                    { "color": "red", "value": 30 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
+      "id": 242,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Days Since Use" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  ak.key_prefix AS \"API Key\",\n  ak.tier AS \"Tier\",\n  COALESCE(u.email, 'N/A') AS \"Owner\",\n  ak.created_at::date::text AS \"Created\",\n  COALESCE(MAX(aul.created_at)::date::text, 'Never') AS \"Last Used\",\n  CASE WHEN MAX(aul.created_at) IS NULL THEN 9999\n       ELSE EXTRACT(DAY FROM NOW() - MAX(aul.created_at))::int\n  END AS \"Days Since Use\"\nFROM api_keys ak\nLEFT JOIN users u ON u.id = ak.user_id\nLEFT JOIN api_usage_logs aul ON aul.api_key_id = ak.id\nWHERE ak.revoked = false\nGROUP BY ak.key_prefix, ak.tier, u.email, ak.created_at\nHAVING CASE WHEN MAX(aul.created_at) IS NULL THEN 9999\n             ELSE EXTRACT(DAY FROM NOW() - MAX(aul.created_at))::int\n       END >= 7\nORDER BY \"Days Since Use\" DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "🕒 Inactive Keys (Last Used ≥7 Days Ago)",
+      "type": "table"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 38,
+  "tags": ["dex", "billing", "quota", "credits"],
+  "templating": { "list": [] },
+  "time": { "from": "now-3M", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Quota & Billing",
+  "uid": "dex-quota-billing",
+  "version": 1
+}

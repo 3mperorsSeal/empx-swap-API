@@ -1,0 +1,534 @@
+{
+  "title": "DEX Chain & Token Analytics",
+  "uid": "dex-chain-analytics",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-7d", "to": "now" },
+  "tags": ["chain", "tokens", "dex", "analytics"],
+  "templating": {
+    "list": [
+      {
+        "name": "chain",
+        "label": "Chain",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "query": "SELECT chain_id || ' - ' || COALESCE(name, chain_id) FROM chains ORDER BY chain_id",
+        "refresh": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "current": {},
+        "sort": 0,
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Chain Overview",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total Chains",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "blue", "mode": "fixed" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS value FROM chains",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Total Adapters",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "purple", "mode": "fixed" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS value FROM chain_adapters",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Total Supported Tokens",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "green", "mode": "fixed" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS value FROM chain_tokens",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Unique Token Types",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "orange", "mode": "fixed" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS value FROM tokens",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Chains Overview",
+      "description": "All configured chains with adapter and token counts",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 5 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "chain_id" },
+            "properties": [{ "id": "custom.width", "value": 120 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "adapters" },
+            "properties": [
+              { "id": "custom.width", "value": 100 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "yellow", "value": 1 },
+                    { "color": "green", "value": 2 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "tokens" },
+            "properties": [{ "id": "custom.width", "value": 100 }]
+          }
+        ]
+      },
+      "options": { "sortBy": [{ "displayName": "chain_id", "desc": false }] },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  c.chain_id,\n  c.name,\n  jsonb_array_length(COALESCE(c.rpc_urls, '[]'::jsonb)) AS rpc_count,\n  COUNT(DISTINCT ca.id) AS adapters,\n  COUNT(DISTINCT ct.id) AS tokens,\n  c.created_at\nFROM chains c\nLEFT JOIN chain_adapters ca ON ca.chain_id = c.id\nLEFT JOIN chain_tokens ct ON ct.chain_id = c.id\nGROUP BY c.id, c.chain_id, c.name, c.rpc_urls, c.created_at\nORDER BY c.chain_id",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Chain Adapters",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Chain Adapter Configuration",
+      "description": "All adapters with priority, RPC limits and fees",
+      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 14 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "priority" },
+            "properties": [
+              { "id": "custom.width", "value": 80 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 50 },
+                    { "color": "red", "value": 100 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-text" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "fee_per_call" },
+            "properties": [
+              { "id": "unit", "value": "currencyUSD" },
+              { "id": "decimals", "value": 8 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "max_rpc_per_min" },
+            "properties": [{ "id": "custom.width", "value": 140 }]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          { "displayName": "chain_id", "desc": false },
+          { "displayName": "priority", "desc": false }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  c.chain_id,\n  c.name AS chain_name,\n  ca.adapter_name,\n  ca.priority,\n  ca.max_rpc_per_min,\n  ca.fee_per_call,\n  ca.created_at\nFROM chain_adapters ca\nJOIN chains c ON c.id = ca.chain_id\nORDER BY c.chain_id, ca.priority",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "bargauge",
+      "title": "Adapters per Chain",
+      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 14 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "green", "value": 2 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  c.chain_id || COALESCE(' (' || c.name || ')', '') AS chain,\n  COUNT(*) AS adapter_count\nFROM chain_adapters ca\nJOIN chains c ON c.id = ca.chain_id\nGROUP BY c.id, c.chain_id, c.name\nORDER BY adapter_count DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Token Registry",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Tokens per Chain",
+      "gridPos": { "h": 8, "w": 10, "x": 0, "y": 24 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  c.chain_id || COALESCE(' (' || c.name || ')', '') AS chain,\n  COUNT(*) AS token_count\nFROM chain_tokens ct\nJOIN chains c ON c.id = ct.chain_id\nGROUP BY c.id, c.chain_id, c.name\nORDER BY token_count DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Token Registry",
+      "description": "All tokens with chain deployments",
+      "gridPos": { "h": 8, "w": 14, "x": 10, "y": 24 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "token_address" },
+            "properties": [{ "id": "custom.width", "value": 380 }]
+          }
+        ]
+      },
+      "options": { "sortBy": [{ "displayName": "symbol", "desc": false }] },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  t.symbol,\n  t.name AS token_name,\n  t.decimals,\n  c.chain_id,\n  ct.token_address,\n  t.coingecko_id\nFROM chain_tokens ct\nJOIN chains c ON c.id = ct.chain_id\nLEFT JOIN tokens t ON t.id = ct.token_id\nORDER BY t.symbol, c.chain_id",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "row",
+      "title": "API Usage by Endpoint Path",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 }
+    },
+    {
+      "id": 14,
+      "type": "bargauge",
+      "title": "Top Called Endpoint Paths",
+      "description": "Most requested API paths from api_usage_logs",
+      "gridPos": { "h": 10, "w": 10, "x": 0, "y": 33 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  path,\n  COUNT(*) AS calls\nFROM api_usage_logs\nWHERE $__timeFilter(created_at)\nGROUP BY path\nORDER BY calls DESC\nLIMIT 15",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "API Calls Over Time by Top Paths",
+      "gridPos": { "h": 10, "w": 14, "x": 10, "y": 33 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 8 } },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "time_series",
+          "rawSql": "SELECT\n  $__timeGroupAlias(created_at,$__interval,'none'),\n  path,\n  COUNT(*) AS calls\nFROM api_usage_logs\nWHERE $__timeFilter(created_at)\n  AND path IN (\n    SELECT path FROM api_usage_logs\n    WHERE $__timeFilter(created_at)\n    GROUP BY path ORDER BY COUNT(*) DESC LIMIT 5\n  )\nGROUP BY 1, path\nORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "table",
+      "title": "Endpoint Error Rate by Path",
+      "description": "Error rate per endpoint path — high error rate may indicate chain/DEX issues",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 43 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "error_rate_pct" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.width", "value": 140 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 5 },
+                    { "color": "red", "value": 20 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "total_calls" },
+            "properties": [{ "id": "custom.width", "value": 120 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "error_calls" },
+            "properties": [{ "id": "custom.width", "value": 120 }]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [{ "displayName": "error_rate_pct", "desc": true }]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  path,\n  method,\n  COUNT(*) AS total_calls,\n  COUNT(*) FILTER (WHERE status >= 400) AS error_calls,\n  ROUND(100.0 * COUNT(*) FILTER (WHERE status >= 400) / NULLIF(COUNT(*), 0), 2) AS error_rate_pct,\n  ROUND(AVG(cost)) AS avg_cost\nFROM api_usage_logs\nWHERE $__timeFilter(created_at)\nGROUP BY path, method\nHAVING COUNT(*) > 5\nORDER BY error_rate_pct DESC\nLIMIT 30",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
