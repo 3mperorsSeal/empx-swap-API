@@ -1,9 +1,8 @@
 import request from "supertest";
 import prisma from "../src/lib/prisma";
 
-jest.mock("../src/lib/prisma", () => ({
-  __esModule: true,
-  default: {
+jest.mock("../src/lib/prisma", () => {
+  const mockPrisma = {
     $executeRaw: jest.fn().mockResolvedValue(0),
     $transaction: jest.fn(),
     api_keys: {
@@ -43,8 +42,13 @@ jest.mock("../src/lib/prisma", () => ({
     tokens: {
       findFirst: jest.fn(),
     },
-  },
-}));
+  };
+  return {
+    __esModule: true,
+    default: mockPrisma,
+    prisma: mockPrisma,
+  };
+});
 
 import app from "../src/index";
 
