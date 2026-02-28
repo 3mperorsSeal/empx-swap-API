@@ -1,58 +1,7 @@
 import { NextFunction, Request, Response } from "express";
-import ipaddr, { IPv4, IPv6 } from "ipaddr.js";
 import { ApiKeyService } from "../../services/apiKeyService";
 import { AppError } from "../errors";
-
-// --------------------
-// Helpers
-// --------------------
-
-function normalizeIp(ip: string): string {
-  return ip.startsWith("::ffff:") ? ip.slice(7) : ip;
-}
-
-function isIPv4(addr: ipaddr.IPv4 | ipaddr.IPv6): addr is IPv4 {
-  return addr.kind() === "ipv4";
-}
-
-function isIPv6(addr: ipaddr.IPv4 | ipaddr.IPv6): addr is IPv6 {
-  return addr.kind() === "ipv6";
-}
-
-function isIpAllowed(ip: string, allowed: string[]): boolean {
-  try {
-    const clientIp = ipaddr.parse(ip);
-
-    return allowed.some((entry) => {
-      if (entry.includes("/")) {
-        const [rangeIp, bits] = ipaddr.parseCIDR(entry);
-
-        if (isIPv4(clientIp) && isIPv4(rangeIp)) {
-          return clientIp.match(rangeIp, bits);
-        }
-
-        if (isIPv6(clientIp) && isIPv6(rangeIp)) {
-          return clientIp.match(rangeIp, bits);
-        }
-
-        return false;
-      }
-
-      return clientIp.toString() === entry;
-    });
-  } catch {
-    return false;
-  }
-}
-
-function isDomainAllowed(host: string, allowed: string[]): boolean {
-  return allowed.some((rule) => {
-    if (rule.startsWith("*.")) {
-      return host.endsWith(rule.slice(1));
-    }
-    return host === rule;
-  });
-}
+import { isDomainAllowed, isIpAllowed, originToHost } from "./ipWhitelist";
 
 // --------------------
 // Middleware
@@ -101,9 +50,7 @@ export async function apiKeyGuard(
     );
   }
 
-  const ip = normalizeIp(rawIp);
-
-  if (allowedIps.length && !isIpAllowed(ip, allowedIps)) {
+  if (allowedIps.length && !isIpAllowed(rawIp, allowedIps)) {
     return next(AppError.Forbidden("ip_not_allowed", "IP not allowed"));
   }
 
@@ -113,16 +60,15 @@ export async function apiKeyGuard(
 
   const origin = req.headers.origin;
   if (origin && allowedDomains.length) {
-    try {
-      const host = new URL(origin).hostname;
-      if (!isDomainAllowed(host, allowedDomains)) {
-        return next(
-          AppError.Forbidden("domain_not_allowed", "Domain not allowed"),
-        );
-      }
-    } catch {
+    const host = originToHost(origin);
+    if (!host) {
       return next(
         AppError.BadRequest("invalid_origin", "Invalid origin header"),
+      );
+    }
+    if (!isDomainAllowed(host, allowedDomains)) {
+      return next(
+        AppError.Forbidden("domain_not_allowed", "Domain not allowed"),
       );
     }
   }

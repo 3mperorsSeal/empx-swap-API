@@ -1,15 +1,7 @@
 import { NextFunction, Request, Response } from "express";
-import { ipMatchesAny } from "../../lib/net";
 import { getApiKeyByPrefix, verifyApiKey } from "../../modules/auth/service";
 import logger from "../logger";
-
-declare global {
-  namespace Express {
-    interface Request {
-      apiKey?: any;
-    }
-  }
-}
+import { isDomainAllowed, isIpAllowed, originToHost } from "./ipWhitelist";
 
 export async function authMiddleware(
   req: Request,
@@ -29,7 +21,7 @@ export async function authMiddleware(
   // Dev convenience: accept TEST_KEY
   const testKey = process.env.TEST_KEY;
   if (testKey && header === testKey) {
-    req.apiKey = { id: 0, key_prefix: "TEST", tier: "pro" };
+    req.apiKey = { id: 0, key_prefix: "TEST", tier: "pro", user_id: null };
     return next();
   }
 
@@ -64,11 +56,10 @@ export async function authMiddleware(
   req.apiKey = record;
   // Whitelist checks (if configured on the API key record)
   try {
-    const whitelistedIps = (record.whitelisted_ips as any) || [];
+    const whitelistedIps = (record.whitelisted_ips as string[]) || [];
     if (Array.isArray(whitelistedIps) && whitelistedIps.length > 0) {
       const ip = req.ip || "";
-      const allowed = ipMatchesAny(ip, whitelistedIps);
-      if (!allowed) {
+      if (!isIpAllowed(ip, whitelistedIps)) {
         logger.warn("auth.whitelist.ip_block", {
           requestId: rid,
           ip,
@@ -80,17 +71,16 @@ export async function authMiddleware(
           .json({ requestId: rid, error: "ip_not_whitelisted" });
       }
     }
-    const whitelistedDomains = (record.whitelisted_domains as any) || [];
+    const whitelistedDomains = (record.whitelisted_domains as string[]) || [];
     if (Array.isArray(whitelistedDomains) && whitelistedDomains.length > 0) {
-      const origin = (req.header("origin") ||
+      const originHeader = (req.header("origin") ||
         req.header("referer") ||
         req.hostname ||
         "") as string;
-      const host = origin.replace(/^https?:\/\//, "").split(/[/?#]/)[0];
-      const allowedDomain = whitelistedDomains.some(
-        (d: string) => host && host.endsWith(d),
-      );
-      if (!allowedDomain) {
+      const host =
+        originToHost(originHeader) ||
+        originHeader.replace(/^https?:\/\//, "").split(/[/?#]/)[0];
+      if (!isDomainAllowed(host, whitelistedDomains)) {
         logger.warn("auth.whitelist.domain_block", {
           requestId: rid,
           host,
