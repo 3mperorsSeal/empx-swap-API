@@ -74,13 +74,15 @@ export async function consumeCredit(opts: {
       }
 
       if (dailyQuotaLimit <= 0) {
-        logger.warn("quotaService.no_quota", {
+        // Endpoint exists but has no quota configured for this tier (quota = null or 0).
+        // Treat as unconfigured → fail-open so legitimate requests aren't blocked.
+        logger.info("quotaService.no_quota_config", {
           path: opts.path,
           method: opts.method,
           tier: tierName,
-          endpoint: ep?.id,
+          endpointId: ep?.id ?? null,
         });
-        return { allowed: false };
+        return { allowed: true };
       }
 
       const date = new Date(

@@ -66,9 +66,21 @@ export async function getEndpointByPathMethod(
   method: string,
 ): Promise<Endpoint | null> {
   try {
-    return await prisma.endpoints.findUnique({
+    // 1. Fast path: exact match
+    const exact = await prisma.endpoints.findUnique({
       where: { path_method: { path, method } },
     });
+    if (exact) return exact;
+
+    // 2. Pattern match: stored paths may use {param} placeholders (e.g. /v1/chains/{chainId}/tokens)
+    //    while the real request path has resolved values (e.g. /v1/chains/1/tokens).
+    const all = await prisma.endpoints.findMany({ where: { method } });
+    for (const ep of all) {
+      // Replace every {placeholder} with a non-slash segment matcher
+      const regexStr = ep.path.replace(/\{[^}]+\}/g, "[^/]+");
+      if (new RegExp(`^${regexStr}$`).test(path)) return ep;
+    }
+    return null;
   } catch (err) {
     logger.error("configService.getEndpointByPathMethod.error", {
       err,
