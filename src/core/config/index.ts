@@ -16,6 +16,16 @@ const envSchema = z.object({
     .enum(["error", "warn", "info", "http", "verbose", "debug", "silly"])
     .default("info"),
   LOG_DIR: z.string().default("logs"),
+  /**
+   * Bearer token required to access the /metrics endpoint.
+   * If omitted, /metrics is open (acceptable on private/internal networks).
+   */
+  METRICS_TOKEN: z.string().optional(),
+  /**
+   * Requests taking longer than this threshold (ms) are logged as warnings
+   * and counted in the slow_requests_total metric. Default: 2000 ms.
+   */
+  SLOW_REQUEST_MS: z.string().transform(Number).default(2000),
 });
 
 const env = envSchema.safeParse(process.env);
