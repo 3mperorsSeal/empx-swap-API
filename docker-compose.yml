@@ -21,23 +21,25 @@ services:
     networks:
       - dex-aggregator
 
-  # backend:
-  #   build: .
-  #   restart: unless-stopped
-  #   env_file:
-  #     - .env                          # picks up all vars from .env automatically
-  #   environment:
-  #     # Override host-specific values for container networking:
-  #     - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/dexdb
-  #     - REDIS_URL=redis://redis:6379
-  #     - PORT=3000
-  #     # Metrics / performance (sourced from .env via env_file above):
-  #     # METRICS_TOKEN and SLOW_REQUEST_MS are forwarded automatically.
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - postgres
-  #     - redis
+  backend:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env # picks up all vars from .env automatically
+    environment:
+      # Override host-specific values for container networking:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/dexdb
+      - REDIS_URL=redis://redis:6379
+      - PORT=3000
+      # Metrics / performance (sourced from .env via env_file above):
+      # METRICS_TOKEN and SLOW_REQUEST_MS are forwarded automatically.
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - dex-aggregator
 
   adminer:
     image: adminer:latest
