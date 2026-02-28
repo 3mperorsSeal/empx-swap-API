@@ -1,7 +1,6 @@
 import { getQuoteUseCase } from "../../application/container";
 import { AppError } from "../../core/errors";
-import { Strategy } from "../../lib/smartRouter";
-import { listTokens, quoteEstimate } from "../../services/quoteService";
+import { listTokens } from "../../services/quoteService";
 import * as chainsService from "../chains/service";
 
 type QuoteStrategy = "fast" | "best" | "split" | "nosplit" | "converge";
@@ -16,16 +15,6 @@ const STRATEGIES = new Set<QuoteStrategy>([
 
 export async function ensureChain(chainId: string) {
   return chainsService.getChain(chainId);
-}
-
-export async function estimate(
-  chainId: string,
-  sellToken: string,
-  buyToken: string,
-  sellAmount: string,
-  strategy: Strategy = "best",
-) {
-  return quoteEstimate(chainId, sellToken, buyToken, sellAmount, strategy);
 }
 
 export function resolveStrategy(
