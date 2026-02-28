@@ -4,7 +4,7 @@ import cors from "cors";
 import express, { NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import path from "path";
-import { collectDefaultMetrics, register } from "prom-client";
+import { metricsRegistry, initDefaultMetrics } from "./core/metrics";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
 
@@ -116,23 +116,22 @@ function setupRoutes(app: express.Express) {
   });
 
   // Health & Metrics
-  try {
-    collectDefaultMetrics();
-  } catch (err: any) {
-    // prom-client throws when metrics are registered twice (e.g. during hot reloads).
-    // Ignore duplicate-registration errors but surface others.
-    const msg = err?.message || String(err);
-    if (msg.includes("has already been registered")) {
-      logger.warn("metrics.already_registered", { message: msg });
-    } else {
-      logger.error("metrics.init_failed", { err });
-      throw err;
-    }
-  }
+  initDefaultMetrics();
+
   app.get("/metrics", async (req, res) => {
+    // Optionally protect with a bearer token configured via METRICS_TOKEN.
+    const metricsToken = config.METRICS_TOKEN;
+    if (metricsToken) {
+      const auth = req.headers["authorization"] || "";
+      const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+      if (provided !== metricsToken) {
+        res.status(401).set("WWW-Authenticate", 'Bearer realm="metrics"').end();
+        return;
+      }
+    }
     try {
-      res.set("Content-Type", register.contentType);
-      res.end(await register.metrics());
+      res.set("Content-Type", metricsRegistry.contentType);
+      res.end(await metricsRegistry.metrics());
     } catch (ex) {
       res.status(500).end(String(ex));
     }

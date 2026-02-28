@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { ApiKeyService } from "../../services/apiKeyService";
 import { AppError } from "../errors";
+import { authFailuresTotal } from "../metrics";
 import { isDomainAllowed, isIpAllowed, originToHost } from "./ipWhitelist";
 
 // --------------------
@@ -14,6 +15,7 @@ export async function apiKeyGuard(
 ) {
   const apiKey = req.header("x-api-key");
   if (!apiKey) {
+    authFailuresTotal.inc({ reason: "missing_key" });
     return next(AppError.Unauthorized("missing_api_key", "Missing API key"));
   }
 
@@ -24,6 +26,9 @@ export async function apiKeyGuard(
   const policy = await ApiKeyService.getPolicy(apiKey.slice(0, 8));
 
   if (!policy || policy.revoked) {
+    authFailuresTotal.inc({
+      reason: policy?.revoked ? "revoked_key" : "invalid_key",
+    });
     return next(
       AppError.Unauthorized("invalid_api_key", "Invalid or revoked API key"),
     );
@@ -42,6 +47,7 @@ export async function apiKeyGuard(
     req.ip;
 
   if (!rawIp) {
+    authFailuresTotal.inc({ reason: "unresolvable_ip" });
     return next(
       AppError.BadRequest(
         "unable_to_resolve_ip",
@@ -51,6 +57,7 @@ export async function apiKeyGuard(
   }
 
   if (allowedIps.length && !isIpAllowed(rawIp, allowedIps)) {
+    authFailuresTotal.inc({ reason: "ip_not_allowed" });
     return next(AppError.Forbidden("ip_not_allowed", "IP not allowed"));
   }
 
@@ -62,11 +69,13 @@ export async function apiKeyGuard(
   if (origin && allowedDomains.length) {
     const host = originToHost(origin);
     if (!host) {
+      authFailuresTotal.inc({ reason: "invalid_origin" });
       return next(
         AppError.BadRequest("invalid_origin", "Invalid origin header"),
       );
     }
     if (!isDomainAllowed(host, allowedDomains)) {
+      authFailuresTotal.inc({ reason: "domain_not_allowed" });
       return next(
         AppError.Forbidden("domain_not_allowed", "Domain not allowed"),
       );

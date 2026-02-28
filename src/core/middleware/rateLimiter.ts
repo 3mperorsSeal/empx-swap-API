@@ -3,6 +3,11 @@ import Redis from "ioredis";
 import { consumeCredit } from "../../services/quotaService";
 import { AppError } from "../errors";
 import logger from "../logger";
+import {
+  normaliseRoute,
+  quotaExceededTotal,
+  rateLimitExceededTotal,
+} from "../metrics";
 
 // Tier limits (rpm)
 const TIER_LIMITS: Record<string, { rpm: number; burst: number }> = {
@@ -131,6 +136,10 @@ export function createRateLimiter(redis: Redis | null): RequestHandler {
       );
 
       if (!allowed) {
+        const route = normaliseRoute(req.path);
+        try {
+          rateLimitExceededTotal.inc({ tier, route });
+        } catch (_) {}
         logger.warn("rate_limit.exceeded", {
           requestId: req.requestId,
           prefix,
@@ -161,6 +170,14 @@ export function createRateLimiter(redis: Redis | null): RequestHandler {
         });
 
         if (!quotaRes.allowed) {
+          const route = normaliseRoute(req.path);
+          try {
+            quotaExceededTotal.inc({
+              tier: req.apiKey?.tier || "unknown",
+              quota_type:
+                quotaRes.remainingPaid !== undefined ? "paid" : "free",
+            });
+          } catch (_) {}
           res.setHeader("Retry-After", "60");
           return next(new AppError("quota_exceeded", "Quota exceeded", 429));
         }

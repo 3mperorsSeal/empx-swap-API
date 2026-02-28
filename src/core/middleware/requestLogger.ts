@@ -1,5 +1,13 @@
 import { NextFunction, Request, Response } from "express";
+import config from "../config";
 import logger from "../logger";
+import {
+  httpRequestDurationSeconds,
+  httpRequestsInFlight,
+  httpRequestsTotal,
+  normaliseRoute,
+  slowRequestsTotal,
+} from "../metrics";
 
 function sanitizeBody(body: any) {
   if (!body || typeof body !== "object") return body;
@@ -25,6 +33,9 @@ export default function requestLogger(
   const start = Date.now();
   const rid = req.requestId || null;
 
+  // Track in-flight requests
+  httpRequestsInFlight.inc();
+
   // Log request start (info)
   try {
     const meta: any = {
@@ -48,12 +59,50 @@ export default function requestLogger(
   }
 
   res.on("finish", () => {
+    httpRequestsInFlight.dec();
+
     const duration = Date.now() - start;
+    const durationSec = duration / 1000;
+    const route = normaliseRoute(req.path);
+    const method = req.method;
+    const status = String(res.statusCode);
+
+    // Record Prometheus metrics
+    try {
+      httpRequestsTotal.inc({ method, route, status });
+      httpRequestDurationSeconds.observe(
+        { method, route, status },
+        durationSec,
+      );
+    } catch (_) {
+      // never let metrics crash the app
+    }
+
+    // Slow-request detection
+    const slowThresholdMs = config.SLOW_REQUEST_MS ?? 2000;
+    const isSlow = duration > slowThresholdMs;
+    if (isSlow) {
+      try {
+        slowRequestsTotal.inc({ method, route });
+      } catch (_) {}
+      logger.warn("request.slow", {
+        requestId: rid,
+        path: req.path,
+        method,
+        status: res.statusCode,
+        duration_ms: duration,
+        threshold_ms: slowThresholdMs,
+        ip: req.ip,
+        apiKeyId: (req as any).apiKey?.id || null,
+        key_prefix: (req as any).apiKey?.key_prefix || null,
+      });
+    }
+
     try {
       const meta: any = {
         requestId: rid,
         path: req.path,
-        method: req.method,
+        method,
         status: res.statusCode,
         duration_ms: duration,
         ip: req.ip,
@@ -61,6 +110,7 @@ export default function requestLogger(
         apiKeyId: (req as any).apiKey?.id || null,
         key_prefix: (req as any).apiKey?.key_prefix || null,
         userId: (req as any).user?.id || null,
+        slow: isSlow || undefined,
       };
       logger.info("request.complete", meta);
     } catch (e) {
