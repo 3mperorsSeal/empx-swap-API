@@ -4,55 +4,155 @@ paths:
       tags:
         - Auth
       summary: Generate API key
-      description: Generate a new API key. Set `persist` to true to store the key in the database (otherwise returned key is ephemeral).
+      description: |
+        Generate a new API key. The raw key is returned **once** in the response
+        — store it securely.
+
+        Set `persist: true` to store the key in the database for long-term use.
+        When `persist: false` (default), the key is ephemeral and only valid for
+        the current server session.
       operationId: generateKey
       requestBody:
         required: false
+        description: Optional configuration for the generated key.
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/GenerateKeyRequest"
-            example:
-              userId: 123
-              tier: "test"
-              persist: true
+              $ref: "../openapi.yaml#/components/schemas/GenerateKeyRequest"
       responses:
         "200":
-          description: OK
+          description: API key generated successfully.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                    description: The raw API key. **Store this securely — it cannot be retrieved again.**
+                    example: "bdb249817fa24149aae322077a0eefb2mkd0s9tf"
+                  prefix:
+                    type: string
+                    description: 8-character prefix used to identify the key (non-secret).
+                    example: "bdb24981"
+                  tier:
+                    type: string
+                    description: Billing tier assigned to this key.
+                    example: "test"
+              example:
+                key: "bdb249817fa24149aae322077a0eefb2mkd0s9tf"
+                prefix: "bdb24981"
+                tier: "test"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
   /v1/auth/revoke:
     post:
       tags:
         - Auth
       summary: Revoke API key
-      description: Revoke API keys matching the provided `prefix`. Requires authentication with a valid API key.
+      description: |
+        Revoke all API keys whose prefix matches the provided value.
+        Requires authentication with a valid API key.
+
+        Once revoked, the key(s) can no longer be used for authentication.
       operationId: revokeKey
       security:
         - ApiKeyAuth: []
       requestBody:
         required: true
+        description: Key prefix identifying the key(s) to revoke.
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RevokeKeyRequest"
-            example:
-              prefix: "test_"
+              $ref: "../openapi.yaml#/components/schemas/RevokeKeyRequest"
       responses:
         "200":
-          description: OK
+          description: Key(s) successfully revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    description: Whether the operation succeeded.
+                    example: true
+                  revoked:
+                    type: integer
+                    description: Number of keys revoked.
+                    example: 1
+              example:
+                ok: true
+                revoked: 1
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
   /v1/auth/me:
     get:
       tags:
         - Auth
-      summary: Current API key
-      description: Return the currently authenticated API key details (attached by `authMiddleware`).
+      summary: Current API key info
+      description: |
+        Returns details about the currently authenticated API key —
+        including its tier, user binding and revocation status.
       operationId: me
       security:
         - ApiKeyAuth: []
       responses:
         "200":
-          description: OK
+          description: Current API key details.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: Internal key ID.
+                    example: 42
+                  key_prefix:
+                    type: string
+                    description: 8-character key prefix.
+                    example: "bdb24981"
+                  tier:
+                    type: string
+                    description: Billing tier of this key.
+                    example: "pro"
+                  revoked:
+                    type: boolean
+                    description: Whether the key has been revoked.
+                    example: false
+                  user_id:
+                    type: integer
+                    nullable: true
+                    description: ID of the user this key belongs to.
+                    example: 10
+                  created_at:
+                    type: string
+                    format: date-time
+                    description: When the key was created.
+                    example: "2026-01-14T00:00:00Z"
+              example:
+                id: 42
+                key_prefix: "bdb24981"
+                tier: "pro"
+                revoked: false
+                user_id: 10
+                created_at: "2026-01-14T00:00:00Z"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
 components:
   securitySchemes:
@@ -60,23 +160,37 @@ components:
       type: apiKey
       in: header
       name: X-API-KEY
+      description: API key passed in the `X-API-KEY` request header.
   schemas:
     GenerateKeyRequest:
       type: object
+      description: Configuration for generating a new API key.
       properties:
         userId:
           anyOf:
             - type: number
             - type: "null"
+          description: Optional user ID to bind the key to.
+          example: 123
         tier:
           type: string
+          description: Pricing tier for the key.
+          enum: [free, developer, pro, enterprise, test]
+          example: "test"
         persist:
           type: boolean
+          description: Store the key in the database for persistence.
+          default: false
+          example: true
       additionalProperties: false
     RevokeKeyRequest:
       type: object
+      description: Request to revoke key(s) by prefix.
       properties:
         prefix:
           type: string
+          description: The 8-character key prefix to revoke.
+          minLength: 1
+          example: "bdb24981"
       required: ["prefix"]
       additionalProperties: false

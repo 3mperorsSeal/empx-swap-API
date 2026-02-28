@@ -4,11 +4,18 @@ paths:
       tags:
         - Chains
       summary: List supported chains
-      description: Returns the supported blockchain networks (chainId and name).
+      description: |
+        Returns all blockchain networks supported by the aggregator.
+        Each chain includes its numeric `chainId` and human-readable `name`.
       operationId: getChains
+      security:
+        - ApiKeyAuth: []
       responses:
         "200":
-          description: OK
+          description: Successfully retrieved the list of supported chains.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
@@ -16,50 +23,91 @@ paths:
                 properties:
                   requestId:
                     type: string
+                    format: uuid
+                    description: Unique request identifier.
                   meta:
                     type: object
                     properties:
                       total:
                         type: integer
+                        description: Total number of supported chains.
                   total:
                     type: integer
+                    description: Total number of supported chains.
                   chains:
                     type: array
+                    description: Array of supported blockchain networks.
                     items:
                       type: object
                       properties:
                         chainId:
                           type: string
+                          description: Numeric chain identifier.
+                          example: "1"
                         name:
                           type: string
+                          description: Human-readable chain name.
+                          example: "Ethereum"
+              example:
+                requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                meta:
+                  total: 3
+                total: 3
+                chains:
+                  - chainId: "1"
+                    name: "Ethereum"
+                  - chainId: "56"
+                    name: "BNB Chain"
+                  - chainId: "137"
+                    name: "Polygon"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "429":
+          $ref: "../openapi.yaml#/components/responses/RateLimited"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
   /v1/chains/{chainId}/tokens:
     get:
       tags:
         - Chains
-      summary: List tokens on chain
-      description: Returns a paginated list of tokens available on the specified chain. Supports `search`, `limit`, and `offset` query filters.
+      summary: List tokens on a chain
+      description: |
+        Returns a **paginated** list of tokens available on the specified chain.
+
+        Use `search` to filter by token symbol or name, and `limit`/`offset` for pagination.
       operationId: getTokens
+      security:
+        - ApiKeyAuth: []
       parameters:
-        - name: chainId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "../openapi.yaml#/components/parameters/ChainIdParam"
         - name: search
           in: query
+          description: Filter tokens by symbol or name (case-insensitive partial match).
           schema:
             type: string
+            example: "USDC"
         - name: limit
           in: query
+          description: Maximum number of tokens to return (default 50, max 500).
           schema:
             type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
         - name: offset
           in: query
+          description: Number of tokens to skip for pagination.
           schema:
             type: integer
+            minimum: 0
+            default: 0
       responses:
         "200":
-          description: OK
+          description: Successfully retrieved tokens for the specified chain.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
@@ -67,47 +115,74 @@ paths:
                 properties:
                   requestId:
                     type: string
+                    format: uuid
+                    description: Unique request identifier.
                   meta:
                     type: object
+                    description: Pagination metadata.
                     properties:
                       total:
                         type: integer
+                        description: Total tokens matching the query.
                       limit:
                         type: integer
+                        description: Requested page size.
                       offset:
                         type: integer
+                        description: Offset used for this page.
                   total:
                     type: integer
+                    description: Total tokens matching the query.
                   items:
                     type: array
+                    description: Array of token objects.
                     items:
-                      type: object
-                      properties:
-                        address:
-                          type: string
-                        symbol:
-                          type: string
-                        name:
-                          type: string
-                        decimals:
-                          type: integer
+                      $ref: "#/components/schemas/Token"
+              example:
+                requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                meta:
+                  total: 256
+                  limit: 50
+                  offset: 0
+                total: 256
+                items:
+                  - address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                    symbol: "USDC"
+                    name: "USD Coin"
+                    decimals: 6
+                  - address: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+                    symbol: "USDT"
+                    name: "Tether USD"
+                    decimals: 6
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "429":
+          $ref: "../openapi.yaml#/components/responses/RateLimited"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
   /v1/chains/{chainId}/adapters:
     get:
       tags:
         - Chains
-      summary: List adapters on chain
-      description: Returns a list of adapters (DEX adapters) registered for the specified chain.
+      summary: List DEX adapters on a chain
+      description: |
+        Returns all DEX adapters (liquidity sources) registered for the specified chain.
+        Each adapter represents a trading venue (e.g. UniswapV3, SushiSwap) and includes
+        its priority, rate limits, and metadata.
       operationId: getAdapters
+      security:
+        - ApiKeyAuth: []
       parameters:
-        - name: chainId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "../openapi.yaml#/components/parameters/ChainIdParam"
       responses:
         "200":
-          description: OK
+          description: Successfully retrieved DEX adapters for the chain.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
@@ -115,34 +190,114 @@ paths:
                 properties:
                   requestId:
                     type: string
+                    format: uuid
+                    description: Unique request identifier.
                   meta:
                     type: object
                     properties:
                       total:
                         type: integer
+                        description: Total number of adapters.
                   total:
                     type: integer
+                    description: Total number of adapters.
                   items:
                     type: array
+                    description: Array of adapter objects.
                     items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                        chain_id:
-                          type: string
-                        adapter_name:
-                          type: string
-                        max_rpc_per_min:
-                          type: integer
-                        fee_per_call:
-                          anyOf:
-                            - type: number
-                            - type: string
-                        priority:
-                          type: integer
-                        metadata:
-                          type: object
-                        created_at:
-                          type: string
-                          format: date-time
+                      $ref: "#/components/schemas/Adapter"
+              example:
+                requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                meta:
+                  total: 2
+                total: 2
+                items:
+                  - id: 1
+                    chain_id: "1"
+                    adapter_name: "UniswapV3"
+                    max_rpc_per_min: 500
+                    fee_per_call: "0.001"
+                    priority: 1
+                    metadata:
+                      { router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45" }
+                    created_at: "2026-01-01T00:00:00Z"
+                  - id: 2
+                    chain_id: "1"
+                    adapter_name: "SushiSwap"
+                    max_rpc_per_min: 300
+                    fee_per_call: "0.002"
+                    priority: 2
+                    metadata: {}
+                    created_at: "2026-01-01T00:00:00Z"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "429":
+          $ref: "../openapi.yaml#/components/responses/RateLimited"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
+components:
+  schemas:
+    Token:
+      type: object
+      description: Represents a tradeable token on a blockchain.
+      properties:
+        address:
+          type: string
+          description: Contract address of the token.
+          example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        symbol:
+          type: string
+          description: Ticker symbol (e.g. USDC, WETH).
+          example: "USDC"
+        name:
+          type: string
+          description: Full name of the token.
+          example: "USD Coin"
+        decimals:
+          type: integer
+          description: Number of decimals the token uses.
+          example: 6
+      required: [address, symbol, name, decimals]
+
+    Adapter:
+      type: object
+      description: A DEX adapter (liquidity source) registered for routing.
+      properties:
+        id:
+          type: integer
+          description: Unique adapter identifier.
+          example: 1
+        chain_id:
+          type: string
+          description: Chain this adapter operates on.
+          example: "1"
+        adapter_name:
+          type: string
+          description: Name of the DEX (e.g. UniswapV3, Curve).
+          example: "UniswapV3"
+        max_rpc_per_min:
+          type: integer
+          description: Maximum RPC calls per minute allowed for this adapter.
+          example: 500
+        fee_per_call:
+          anyOf:
+            - type: number
+            - type: string
+          description: Fee charged per routing call in USD.
+          example: "0.001"
+        priority:
+          type: integer
+          description: Routing priority (lower = higher priority).
+          example: 1
+        metadata:
+          type: object
+          description: Adapter-specific configuration data.
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the adapter was registered.
+          example: "2026-01-01T00:00:00Z"

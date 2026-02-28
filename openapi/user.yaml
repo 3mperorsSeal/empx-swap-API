@@ -3,17 +3,30 @@ paths:
     post:
       tags:
         - Users
-      summary: Register user
+      summary: Register a new user
+      description: |
+        Create a new user account. Returns the created user object.
+
+        The `email` and `password` fields are required. Optionally provide
+        `name` and `role` (defaults to `"user"`).
       operationId: userRegister
       requestBody:
         required: true
+        description: User registration details.
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/RegisterRequest"
+            example:
+              email: "alice@example.com"
+              name: "Alice"
+              password: "s3cretP@ss"
       responses:
         "200":
-          description: Registered user
+          description: User registered successfully.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
@@ -27,29 +40,53 @@ paths:
                       email: "alice@example.com"
                       name: "Alice"
                       role: "user"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "409":
+          description: |
+            **409 Conflict** — A user with this email already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorResponse"
+              example:
+                requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                error: "email_taken"
+                message: "A user with this email already exists"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
   /v1/auth/user/login:
     post:
       tags:
         - Users
-      summary: Login user and return JWT
+      summary: Login and receive JWT
+      description: |
+        Authenticate with email and password. Returns a JWT token for
+        accessing protected dashboard endpoints.
+
+        Include the token in subsequent requests as:
+        ```
+        Authorization: Bearer <token>
+        ```
       operationId: userLogin
       requestBody:
         required: true
+        description: User login credentials.
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
-          description: Login successful
+          description: Login successful — JWT token returned.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/LoginResponse"
               examples:
                 success:
-                  summary: Example login response
+                  summary: Successful login
                   value:
                     token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                     user:
@@ -57,18 +94,36 @@ paths:
                       email: "alice@example.com"
                       name: "Alice"
                       role: "user"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          description: |
+            **401 Unauthorized** — Invalid email or password.
+          content:
+            application/json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorResponse"
+              example:
+                requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                error: "invalid_credentials"
+                message: "Invalid email or password"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
   /v1/auth/user/me:
     get:
       tags:
         - Users
       summary: Current logged-in user
+      description: |
+        Returns profile information for the currently authenticated user
+        (identified by the JWT in the `Authorization` header).
       operationId: userMe
       security:
         - BearerAuth: []
       responses:
         "200":
-          description: Current user info
+          description: Current user profile.
           content:
             application/json:
               schema:
@@ -82,70 +137,96 @@ paths:
                       email: "alice@example.com"
                       name: "Alice"
                       role: "user"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
 components:
   schemas:
     RegisterRequest:
       type: object
+      description: User registration payload.
       properties:
         email:
           type: string
+          format: email
+          description: Email address (must be unique).
+          example: "alice@example.com"
         name:
           type: string
+          description: Display name (optional).
+          example: "Alice"
         password:
           type: string
+          format: password
+          description: Account password (min 8 characters recommended).
+          minLength: 6
+          example: "s3cretP@ss"
         role:
           type: string
+          description: User role. Defaults to `"user"`.
+          enum: [user, admin]
+          default: "user"
+          example: "user"
       required: ["email", "password"]
+      additionalProperties: false
+
     LoginRequest:
       type: object
+      description: User login credentials.
       properties:
         email:
           type: string
+          format: email
+          description: Registered email address.
+          example: "alice@example.com"
         password:
           type: string
+          format: password
+          description: Account password.
+          example: "s3cretP@ss"
       required: ["email", "password"]
-      example:
-        email: "alice@example.com"
-        password: "s3cretP@ss"
+      additionalProperties: false
+
     LoginResponse:
       type: object
+      description: Successful login response containing a JWT and user profile.
       properties:
         token:
           type: string
+          description: JSON Web Token for authenticating subsequent requests.
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
         user:
           $ref: "#/components/schemas/User"
-      example:
-        token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-        user:
-          id: 10
-          email: "alice@example.com"
-          name: "Alice"
-          role: "user"
+
     UserResponse:
       type: object
+      description: Envelope wrapping a single user object.
       properties:
         user:
           $ref: "#/components/schemas/User"
-      example:
-        user:
-          id: 10
-          email: "alice@example.com"
-          name: "Alice"
-          role: "user"
+
     User:
       type: object
+      description: User profile object.
       properties:
         id:
           type: integer
+          description: Unique user identifier.
+          example: 10
         email:
           type: string
+          format: email
+          description: User's email address.
+          example: "alice@example.com"
         name:
           type: string
+          description: User's display name.
+          example: "Alice"
         role:
           type: string
-      example:
-        id: 10
-        email: "alice@example.com"
-        name: "Alice"
-        role: "user"
+          description: User's role in the system.
+          enum: [user, admin]
+          example: "user"
+      required: [id, email, role]

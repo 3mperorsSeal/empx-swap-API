@@ -3,13 +3,19 @@ paths:
     get:
       tags:
         - Partners
-      summary: List partners
+      summary: List all partners
+      description: |
+        Returns a list of all registered partner organisations.
+        Partners are companies integrating the swap API for revenue sharing.
       operationId: listPartners
       security:
         - BearerAuth: []
       responses:
         "200":
-          description: List of partners
+          description: Successfully retrieved partners.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
@@ -17,8 +23,11 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    description: Whether the operation succeeded.
+                    example: true
                   data:
                     type: array
+                    description: Array of partner objects.
                     items:
                       $ref: "#/components/schemas/Partner"
               examples:
@@ -33,22 +42,31 @@ paths:
                         wallet_address: "0x0123456789abcdef0123456789abcdef01234567"
                         created_at: "2026-01-01T00:00:00Z"
                         updated_at: "2026-01-01T00:00:00Z"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
     post:
       tags:
         - Partners
       summary: Create a new partner
+      description: |
+        Register a new partner organisation. Requires `company_name` and
+        `wallet_address` at minimum.
       operationId: createPartner
       security:
         - BearerAuth: []
       requestBody:
         required: true
+        description: Partner details.
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/PartnerInput"
       responses:
         "200":
-          description: Created partner
+          description: Partner created successfully.
           content:
             application/json:
               schema:
@@ -56,11 +74,12 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    example: true
                   data:
                     $ref: "#/components/schemas/Partner"
               examples:
                 created:
-                  summary: Created partner example
+                  summary: Created partner
                   value:
                     success: true
                     data:
@@ -70,11 +89,19 @@ paths:
                       wallet_address: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
                       created_at: "2026-01-15T00:00:00Z"
                       updated_at: "2026-01-15T00:00:00Z"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
   /v1/partners/{id}:
     get:
       tags:
         - Partners
-      summary: Get partner by id
+      summary: Get partner by ID
+      description: Returns a single partner by its unique identifier.
       operationId: getPartner
       security:
         - BearerAuth: []
@@ -82,11 +109,13 @@ paths:
         - in: path
           name: id
           required: true
+          description: Unique partner identifier.
           schema:
             type: string
+            example: "1"
       responses:
         "200":
-          description: Partner item
+          description: Partner found.
           content:
             application/json:
               schema:
@@ -94,6 +123,7 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    example: true
                   data:
                     $ref: "#/components/schemas/Partner"
               examples:
@@ -108,10 +138,18 @@ paths:
                       wallet_address: "0x0123456789abcdef0123456789abcdef01234567"
                       created_at: "2026-01-01T00:00:00Z"
                       updated_at: "2026-01-01T00:00:00Z"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "../openapi.yaml#/components/responses/NotFound"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
     put:
       tags:
         - Partners
-      summary: Update partner by id
+      summary: Update partner
+      description: Update an existing partner's details by ID.
       operationId: updatePartner
       security:
         - BearerAuth: []
@@ -119,17 +157,20 @@ paths:
         - in: path
           name: id
           required: true
+          description: Unique partner identifier.
           schema:
             type: string
+            example: "1"
       requestBody:
         required: true
+        description: Updated partner details.
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/PartnerInput"
       responses:
         "200":
-          description: Updated partner
+          description: Partner updated successfully.
           content:
             application/json:
               schema:
@@ -137,12 +178,23 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    example: true
                   data:
                     $ref: "#/components/schemas/Partner"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "../openapi.yaml#/components/responses/NotFound"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
     delete:
       tags:
         - Partners
-      summary: Delete partner by id
+      summary: Delete partner
+      description: Permanently delete a partner organisation by ID.
       operationId: deletePartner
       security:
         - BearerAuth: []
@@ -150,11 +202,13 @@ paths:
         - in: path
           name: id
           required: true
+          description: Unique partner identifier.
           schema:
             type: string
+            example: "1"
       responses:
         "200":
-          description: Deleted partner
+          description: Partner deleted successfully.
           content:
             application/json:
               schema:
@@ -162,55 +216,77 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    example: true
               examples:
                 deleted:
-                  summary: Deleted response
+                  summary: Deleted
                   value:
                     success: true
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "../openapi.yaml#/components/responses/NotFound"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
 components:
   schemas:
     Partner:
       type: object
+      description: A partner organisation.
       properties:
         id:
           type: string
+          description: Unique partner identifier.
+          example: "1"
         company_name:
           type: string
+          description: Partner company name.
+          example: "Acme Corp"
         website:
           anyOf:
             - type: string
+              format: uri
             - type: "null"
+          description: Partner website URL (optional).
+          example: "https://acme.example"
         wallet_address:
           type: string
+          description: EVM wallet address for revenue distribution.
+          pattern: "^0x[a-fA-F0-9]{40}$"
+          example: "0x0123456789abcdef0123456789abcdef01234567"
         created_at:
           type: string
           format: date-time
+          description: When the partner was created.
+          example: "2026-01-01T00:00:00Z"
         updated_at:
           type: string
           format: date-time
+          description: Last update timestamp.
+          example: "2026-01-01T00:00:00Z"
       required: [id, company_name, wallet_address]
-      example:
-        id: "1"
-        company_name: "Acme Corp"
-        website: "https://acme.example"
-        wallet_address: "0x0123456789abcdef0123456789abcdef01234567"
-        created_at: "2026-01-01T00:00:00Z"
-        updated_at: "2026-01-01T00:00:00Z"
 
     PartnerInput:
       type: object
+      description: Payload for creating or updating a partner.
       properties:
         company_name:
           type: string
+          description: Partner company name.
+          minLength: 1
+          example: "New Co"
         website:
           anyOf:
             - type: string
+              format: uri
             - type: "null"
+          description: Partner website URL (optional).
+          example: null
         wallet_address:
           type: string
+          description: EVM wallet address for revenue distribution.
+          pattern: "^0x[a-fA-F0-9]{40}$"
+          example: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
       required: [company_name, wallet_address]
       additionalProperties: false
-      example:
-        company_name: "New Co"
-        website: null
-        wallet_address: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"

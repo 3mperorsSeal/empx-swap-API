@@ -1,6 +1,7 @@
 import express from "express";
 import * as controller from "./controller";
-import { validateOperation } from "../../core/middleware/openapiValidator";
+import { validateParams, validateQuery } from "../../core/middleware/validate";
+import { chainIdParamSchema, tokensQuerySchema } from "./validation";
 
 const router = express.Router();
 
@@ -8,12 +9,13 @@ const router = express.Router();
 router.get("/", controller.getChains);
 router.get(
   "/:chainId/tokens",
-  validateOperation("getTokens"),
+  validateParams(chainIdParamSchema),
+  validateQuery(tokensQuerySchema),
   controller.getTokens,
 );
 router.get(
   "/:chainId/adapters",
-  validateOperation("getAdapters"),
+  validateParams(chainIdParamSchema),
   controller.getAdapters,
 );
 

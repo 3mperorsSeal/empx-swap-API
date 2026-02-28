@@ -1,81 +1,126 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
-  title: DEX Aggregator API
+  title: EMPX Swap API
   description: |
+    **A fast, multi-chain DEX aggregation service** that finds and builds optimal
+    swap routes across leading liquidity sources (Uniswap, SushiSwap, Curve, 1inch, etc.).
 
-    A fast, multi-chain DEX aggregation service that finds and builds swap
-    routes across leading liquidity sources. Use this API to get price
-    quotations, compare routing strategies, and build transactions ready to
-    sign and broadcast.
+    Use this API to:
+    - **Discover** supported chains, tokens and DEX adapters.
+    - **Get quotes** — single fast quotes, strategy-optimized best quotes, or batch quotes.
+    - **Build transactions** — receive unsigned swap calldata ready to sign and broadcast.
+    - **Manage API keys** — create, rotate, revoke and whitelist your keys.
+
+    ---
 
     ## Authentication
 
-    - Include your API key in the `X-API-KEY` header for most production
-      endpoints.
-    - Example: `X-API-KEY: sk_live_your_key_here`
+    Most endpoints require an API key passed via the `X-API-KEY` header:
 
-    Get or manage API keys in the dashboard: https://yourdex.com/dashboard
+    ```
+    X-API-KEY: sk_live_your_key_here
+    ```
 
-    ## Rate limits
+    Dashboard and user-management endpoints use `Authorization: Bearer <JWT>`.
 
-    - Free: 100 requests / minute
-    - Developer: 1,000 requests / minute
-    - Pro: 10,000 requests / minute
-    - Enterprise: contact sales for custom limits
+    ## Rate Limits
 
-    ## Routing strategies
+    | Tier         | Requests / min | Burst |
+    |--------------|---------------:|------:|
+    | Free         |            100 |   20  |
+    | Developer    |          1,000 |  100  |
+    | Pro          |         10,000 |  500  |
+    | Enterprise   |  custom (contact sales) | — |
 
-    Choose the tradeoff between speed and price:
+    Rate-limit headers are returned on **every** response:
+    - `X-RateLimit-Limit` – max requests allowed in the window
+    - `X-RateLimit-Remaining` – requests remaining
+    - `X-RateLimit-Reset` – UTC epoch seconds when the window resets
 
-    - `fast` (noSplit) — Single-path route focused on lowest latency.
-    - `split` — Split trade across multiple pools/protocols to improve price.
-    - `converge` — Two-stage routing for very large trades to reduce impact.
-    - `auto` — Let the system choose the best strategy for the request.
+    ## Routing Strategies
 
-    ## Quick links
+    | Strategy    | Behaviour |
+    |-------------|-----------|
+    | `fast`      | Single-path, lowest latency |
+    | `split`     | Split across pools for better price |
+    | `converge`  | Two-stage routing for very large trades |
+    | `auto`      | System picks the optimal strategy |
 
-    - Swagger UI (interactive docs): `/api-docs`
-    - Raw spec (YAML): `/openapi.yaml`
-    - Raw spec (JSON): `/openapi.json`
+    ## Error Envelope
 
-    ## Tips
+    All errors follow a consistent JSON envelope:
 
-    - Use `timeout` on the `/quote/best` endpoint when querying many
-      strategies to bound compute time.
-    - Include a `recipient` for swap builds to construct final calldata.
+    ```json
+    {
+      "requestId": "abc-123",
+      "error": "error_code",
+      "message": "Human-readable description",
+      "details": {}
+    }
+    ```
+
+    ## Quick Links
+
+    | Resource | URL |
+    |----------|-----|
+    | Swagger UI | [`/api-docs`](/api-docs) |
+    | OpenAPI JSON | [`/openapi.json`](/openapi.json) |
+    | OpenAPI YAML | [`/openapi.yaml`](/openapi.yaml) |
+    | Support | <support@yourdex.com> |
+
   version: "1.0.0"
   contact:
-    name: API Support
+    name: EMPX API Support
     email: support@yourdex.com
     url: https://yourdex.com/support
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
   termsOfService: https://yourdex.com/terms
+
+  x-logo:
+    url: https://yourdex.com/logo.png
+    altText: EMPX Swap
+
 servers:
   - url: http://localhost:3000
     description: Local development
   - url: https://api.yourdex.com/v1
-    description: Production server
+    description: Production
   - url: https://api-staging.yourdex.com/v1
-    description: Staging server
+    description: Staging
+
 tags:
   - name: Chains
-    description: Chain and token discovery
+    description: |
+      Discover the blockchain networks, tokens and DEX adapters supported by the aggregator.
   - name: Quotes
-    description: Quote endpoints (fast, best, batch)
+    description: |
+      Obtain price quotes for token swaps — fast single estimates, optimized best-price quotes,
+      or batch multiple requests in one call.
   - name: Swap
-    description: Swap transaction building endpoints
+    description: |
+      Build unsigned swap transactions ready for signing and on-chain submission.
   - name: Auth
-    description: Authentication and API key management
+    description: |
+      Generate, revoke and inspect API keys. Keys are required for all protected endpoints.
   - name: Users
-    description: User registration and session endpoints
+    description: |
+      User registration, login (JWT), and profile endpoints.
   - name: Dashboard
-    description: Admin/dashboard endpoints for API key management and analytics
+    description: |
+      Dashboard endpoints for managing API keys (CRUD), whitelist configuration
+      and per-key usage analytics.
   - name: Partners
-    description: Dashboard partners management endpoints
+    description: |
+      Manage partner organisations for revenue sharing and branding.
+  - name: Billing
+    description: |
+      Purchase additional credits and query remaining quota.
   - name: System
-    description: Health, status, and protected test routes
+    description: |
+      Health checks, Prometheus metrics and internal admin utilities.
+
 security:
   - ApiKeyAuth: []
 paths:
@@ -212,83 +257,293 @@ components:
       type: apiKey
       in: header
       name: X-API-KEY
+      description: API key passed in the `X-API-KEY` request header. Generate keys via `/v1/auth/generate` or the dashboard.
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: JSON Web Token obtained from `/v1/auth/user/login`.
+
+  parameters:
+    ChainIdParam:
+      name: chainId
+      in: path
+      required: true
+      description: Numeric chain identifier (e.g. `1` for Ethereum mainnet, `56` for BSC).
+      schema:
+        type: string
+        pattern: '^\d+$'
+        example: "1"
+    PaginationLimit:
+      name: limit
+      in: query
+      description: Maximum number of items to return (default 50, max 500).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 50
+    PaginationOffset:
+      name: offset
+      in: query
+      description: Number of items to skip for pagination.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  headers:
+    X-RateLimit-Limit:
+      description: Maximum requests allowed in the current window.
+      schema:
+        type: integer
+        example: 1000
+    X-RateLimit-Remaining:
+      description: Requests remaining in the current window.
+      schema:
+        type: integer
+        example: 950
+    X-RateLimit-Reset:
+      description: UTC epoch seconds when the rate-limit window resets.
+      schema:
+        type: integer
+        example: 1709330400
+    X-Request-Id:
+      description: Unique identifier for the request (pass this when contacting support).
+      schema:
+        type: string
+        format: uuid
+        example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+  responses:
+    BadRequest:
+      description: |
+        **400 Bad Request** — The request body, query parameters or path parameters failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            error: "validation_error"
+            message: "sellAmount must be a numeric string"
+            details:
+              field: "sellAmount"
+              issue: "invalid_format"
+    Unauthorized:
+      description: |
+        **401 Unauthorized** — Missing or invalid API key / JWT token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            error: "unauthorized"
+            message: "Invalid or missing API key"
+    Forbidden:
+      description: |
+        **403 Forbidden** — The authenticated key does not have permission for this resource.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            error: "forbidden"
+            message: "Insufficient permissions"
+    NotFound:
+      description: |
+        **404 Not Found** — The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            error: "not_found"
+            message: "Resource not found"
+    RateLimited:
+      description: |
+        **429 Too Many Requests** — Rate limit exceeded. Check `X-RateLimit-*` response headers.
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/X-RateLimit-Limit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/X-RateLimit-Remaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/X-RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            error: "rate_limited"
+            message: "Too many requests, please try again later"
+    InternalError:
+      description: |
+        **500 Internal Server Error** — An unexpected error occurred on the server.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            error: "internal_server_error"
+            message: "An unexpected error occurred"
+
   schemas:
+    ErrorResponse:
+      type: object
+      description: Standardized error envelope returned by all endpoints.
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          description: Unique request identifier for tracing and support.
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        error:
+          type: string
+          description: Machine-readable error code (e.g. `validation_error`, `unauthorized`).
+          example: "validation_error"
+        message:
+          type: string
+          description: Human-readable error description (only in development mode for 500s).
+          example: "sellAmount must be a numeric string"
+        details:
+          type: object
+          description: Additional structured details about the error.
+          additionalProperties: true
+      required: [error]
+
     GenerateKeyRequest:
       type: object
+      description: Request body to generate a new API key.
       properties:
         userId:
           anyOf:
             - type: number
             - type: "null"
+          description: Optional user ID to bind the key to.
+          example: 123
         tier:
           type: string
+          description: Pricing tier for the key.
+          enum: [free, developer, pro, enterprise, test]
+          example: "test"
         persist:
           type: boolean
+          description: When `true`, the key is stored in the database. When `false`, the key is ephemeral.
+          default: false
+          example: true
       additionalProperties: false
       example:
         userId: 123
         tier: "test"
         persist: true
+
     RevokeKeyRequest:
       type: object
+      description: Request body to revoke API key(s) matching a prefix.
       properties:
         prefix:
           type: string
+          description: The 8-character key prefix identifying the key to revoke.
+          minLength: 1
+          example: "bdb24981"
       required: ["prefix"]
       additionalProperties: false
       example:
-        prefix: "test_"
+        prefix: "bdb24981"
+
     QuoteItem:
       type: object
+      description: A single quote request specifying the swap pair and amount.
       properties:
         sellToken:
           type: string
+          description: Address or symbol of the token to sell.
+          example: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
         buyToken:
           type: string
+          description: Address or symbol of the token to buy.
+          example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
         sellAmount:
           type: string
+          description: Amount of sell token in its smallest unit (wei for ETH).
+          pattern: '^\d+$'
+          example: "1000000000000000000"
       required: ["sellToken", "buyToken", "sellAmount"]
       additionalProperties: false
-      example:
-        sellToken: "ETH"
-        buyToken: "USDC"
-        sellAmount: "1000000000000000000"
+
     QuoteBatchRequest:
       type: object
+      description: Batch of quote requests to process in a single API call.
       properties:
         quotes:
           type: array
+          description: Array of individual quote requests (1–50 items).
+          minItems: 1
+          maxItems: 50
           items:
             $ref: "#/components/schemas/QuoteItem"
       required: ["quotes"]
       additionalProperties: false
       example:
         quotes:
-          - sellToken: "ETH"
-            buyToken: "USDC"
+          - sellToken: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            buyToken: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
             sellAmount: "1000000000000000000"
-          - sellToken: "DAI"
-            buyToken: "USDC"
-            sellAmount: "1000000"
+          - sellToken: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+            buyToken: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            sellAmount: "1000000000000000000000"
+
     SwapBuildRequest:
       type: object
+      description: Request body for building an unsigned swap transaction.
       properties:
         sellToken:
           type: string
+          description: Address or symbol of the token being sold.
+          example: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
         buyToken:
           type: string
+          description: Address or symbol of the token being purchased.
+          example: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
         sellAmount:
           type: string
+          description: Amount of sell token in its smallest unit.
+          pattern: '^\d+$'
+          example: "500000000000000000"
         recipient:
           type: string
+          description: |
+            Wallet address that will receive the bought tokens.
+            Must be a valid EVM address (`0x` + 40 hex chars).
+          pattern: "^0x[a-fA-F0-9]{40}$"
+          example: "0x0123456789abcdef0123456789abcdef01234567"
+        slippage:
+          type: number
+          description: Maximum acceptable slippage in basis points (0–10000, i.e. 0%–100%).
+          minimum: 0
+          maximum: 10000
+          example: 50
+        fee:
+          type: number
+          description: Fee in basis points charged on top of the swap (0–10000).
+          minimum: 0
+          maximum: 10000
+          example: 30
+        deadline:
+          type: number
+          description: Unix timestamp after which the transaction is no longer valid.
+          example: 1709330400
       required: ["sellToken", "buyToken", "sellAmount"]
       additionalProperties: false
       example:
-        sellToken: "ETH"
-        buyToken: "DAI"
+        sellToken: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        buyToken: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
         sellAmount: "500000000000000000"
         recipient: "0x0123456789abcdef0123456789abcdef01234567"
+        slippage: 50

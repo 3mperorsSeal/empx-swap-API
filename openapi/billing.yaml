@@ -3,12 +3,18 @@ paths:
     post:
       tags:
         - Billing
-      summary: Purchase extra monthly credits (test shim)
+      summary: Purchase extra credits
+      description: |
+        Purchase additional monthly API credits for the authenticated key.
+
+        > **Note:** This is currently a test/shim endpoint. In production it will
+        > integrate with a payment provider.
+      operationId: purchaseCredits
       security:
         - ApiKeyAuth: []
       requestBody:
-        description: Credits to purchase (optional)
         required: false
+        description: Number of credits to purchase. Defaults to a tier-specific amount if omitted.
         content:
           application/json:
             schema:
@@ -16,9 +22,17 @@ paths:
               properties:
                 credits:
                   type: integer
+                  description: Number of credits to add to the account.
+                  minimum: 1
+                  example: 1000
+            example:
+              credits: 1000
       responses:
         "200":
-          description: Credits granted
+          description: Credits successfully purchased and applied.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
@@ -26,18 +40,36 @@ paths:
                 properties:
                   ok:
                     type: boolean
+                    description: Whether the purchase succeeded.
+                    example: true
                   creditsGranted:
                     type: integer
+                    description: Number of credits added to the account.
+                    example: 1000
+              example:
+                ok: true
+                creditsGranted: 1000
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
   /v1/billing/usage:
     get:
       tags:
         - Billing
-      summary: Get remaining paid and free quota
+      summary: Get remaining quota
+      description: |
+        Returns the remaining paid and free quota for the authenticated API key.
+        Use this to monitor usage and trigger alerts before hitting limits.
+      operationId: getBillingUsage
       security:
         - ApiKeyAuth: []
       responses:
         "200":
-          description: Usage info
+          description: Current quota information.
           content:
             application/json:
               schema:
@@ -45,10 +77,26 @@ paths:
                 properties:
                   ok:
                     type: boolean
+                    description: Whether the query succeeded.
+                    example: true
                   usage:
                     type: object
+                    description: Remaining credits breakdown.
                     properties:
                       remainingPaid:
                         type: integer
+                        description: Remaining purchased (paid) credits.
+                        example: 800
                       remainingFree:
                         type: integer
+                        description: Remaining free-tier credits for the current period.
+                        example: 50
+              example:
+                ok: true
+                usage:
+                  remainingPaid: 800
+                  remainingFree: 50
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
