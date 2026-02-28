@@ -1,56 +1,9 @@
 import { AppError } from "../core/errors";
 import logger from "../core/logger";
-import prisma from "../lib/prisma";
+import { getPartnerFee } from "../domain/fee/FeePolicy";
+import { isNativeToken, resolveTokenInput } from "../domain/token/NativeTokens";
+import { staticTokenRepository } from "../domain/token/StaticTokenRepository";
 import { SmartRouter, SwapBuildRequest } from "../lib/smartRouter";
-import { findToken } from "./quoteService";
-
-/**
- * Get partner fee from database
- * Returns the fee in basis points (e.g., 30 = 0.30%)
- */
-async function getPartnerFee(apiKey?: string): Promise<number> {
-  // Default platform fee: 0.25% = 25 basis points
-  const DEFAULT_FEE = 25;
-
-  if (!apiKey) {
-    logger.info("No API key provided, using default platform fee", {
-      fee: DEFAULT_FEE,
-    });
-    return DEFAULT_FEE;
-  }
-
-  try {
-    // Prefix is first 8 chars
-    const prefix = apiKey.length > 8 ? apiKey.substring(0, 8) : apiKey;
-
-    const keyRecord = await prisma.api_keys.findFirst({
-      where: { key_prefix: prefix, revoked: false },
-    });
-
-    if (!keyRecord) {
-      logger.warn("API key not found or revoked, using default fee", {
-        prefix,
-      });
-      return DEFAULT_FEE;
-    }
-
-    // Tier-based fees
-    const tierFees: Record<string, number> = {
-      free: 30, // 0.30%
-      developer: 25, // 0.25%
-      pro: 20, // 0.20%
-    };
-
-    const tierFee = tierFees[keyRecord.tier] || DEFAULT_FEE;
-    logger.info("Using tier-based fee", { tier: keyRecord.tier, fee: tierFee });
-    return tierFee;
-  } catch (error) {
-    logger.error("Error fetching partner fee from database", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return DEFAULT_FEE;
-  }
-}
 
 /**
  * Build swap transaction with partner fee support
@@ -76,15 +29,13 @@ export async function buildSwapTransaction(
     apiKey?: string;
   },
 ) {
-  const sell = findToken(chainId, sellToken);
-  const buy = findToken(chainId, buyToken);
+  const sell = staticTokenRepository.findBySymbolOrAddress(chainId, sellToken);
+  const buy = staticTokenRepository.findBySymbolOrAddress(chainId, buyToken);
+  const isSellNative = isNativeToken(sellToken);
+  const isBuyNative = isNativeToken(buyToken);
 
-  const tokenIn = sell ? sell.address : sellToken;
-  const tokenOut = buy ? buy.address : buyToken;
-
-  const nativeSymbols = ["ETH", "PLS", "MATIC", "PULSE"];
-  const isSellNative = nativeSymbols.includes(sellToken.toUpperCase());
-  const isBuyNative = nativeSymbols.includes(buyToken.toUpperCase());
+  const tokenIn = resolveTokenInput(sell, sellToken, isSellNative);
+  const tokenOut = resolveTokenInput(buy, buyToken, isBuyNative);
 
   // Validate addresses
   if (!isSellNative && (!tokenIn || !tokenIn.startsWith("0x"))) {
