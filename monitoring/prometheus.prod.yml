@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+# ---------------------------------------------------------------------------
+# Alertmanager — uncomment and point to your Alertmanager instance
+# ---------------------------------------------------------------------------
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ["alertmanager:9093"]
+
+# ---------------------------------------------------------------------------
+# Alert rule files
+# ---------------------------------------------------------------------------
+rule_files:
+  - "alerts/*.yml"
+
+scrape_configs:
+  # -------------------------------------------------------------------------
+  # Prometheus self-monitoring
+  # -------------------------------------------------------------------------
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # -------------------------------------------------------------------------
+  # DEX Aggregator API — authenticated scrape via METRICS_TOKEN
+  # -------------------------------------------------------------------------
+  - job_name: "dex-aggregator-api"
+    scrape_interval: 10s
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics_token
+    static_configs:
+      - targets: ["backend:3000"]
+        labels:
+          service: "dex-aggregator-api"
+          env: "production"

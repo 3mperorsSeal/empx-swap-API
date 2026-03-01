@@ -4,117 +4,195 @@ paths:
       tags:
         - Quotes
       summary: Fast quote
-      description: Return a quick price estimate for swapping `sellToken` -> `buyToken` on the given chain. Optimized for speed and low latency.
+      description: |
+        Returns a **quick price estimate** for swapping `sellToken` → `buyToken`
+        on the given chain. Optimised for the lowest latency possible, using a
+        single-path (noSplit) routing strategy.
+
+        Use this when you need instant indicative pricing, e.g. to display in a UI
+        before the user commits. For the best possible price, use `/best` instead.
       operationId: quoteFast
+      security:
+        - ApiKeyAuth: []
       parameters:
-        - name: chainId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "../openapi.yaml#/components/parameters/ChainIdParam"
         - name: sellToken
           in: query
           required: true
+          description: Address or symbol of the token to sell.
           schema:
             type: string
+            example: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
         - name: buyToken
           in: query
           required: true
+          description: Address or symbol of the token to buy.
           schema:
             type: string
+            example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
         - name: sellAmount
           in: query
           required: true
+          description: Amount of sell token in its smallest unit (e.g. wei for ETH).
           schema:
             type: string
+            pattern: '^\d+$'
+            example: "1000000000000000000"
       responses:
         "200":
-          description: OK
+          description: Successfully computed a fast quote.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  requestId:
-                    type: string
-                  strategy:
-                    type: string
-                  quote:
-                    type: object
+                $ref: "#/components/schemas/QuoteResponse"
+              example:
+                requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                strategy: "fast"
+                quote:
+                  sellToken: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                  buyToken: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  sellAmount: "1000000000000000000"
+                  buyAmount: "3450000000"
+                  price: "3450.00"
+                  sources:
+                    - name: "UniswapV3"
+                      proportion: "1.0"
+                  estimatedGas: "145000"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "429":
+          $ref: "../openapi.yaml#/components/responses/RateLimited"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
   /v1/quotes/{chainId}/best:
     get:
       tags:
         - Quotes
-      summary: Best quote (strategy)
-      description: Compute the best quote for a swap using the selected `strategy` (or default). Supports an optional `timeout` to limit search duration.
+      summary: Best quote (strategy-optimised)
+      description: |
+        Computes the **best available quote** for a swap using the selected
+        `strategy` (defaults to `auto`).
+
+        Strategies:
+        - **fast** — single-path, lowest latency
+        - **split** — splits across pools for better price
+        - **converge** — two-stage routing for very large trades
+        - **auto** — system picks the best for your trade size
+
+        Use the optional `timeout` parameter (ms) to bound the search duration.
       operationId: quoteBest
+      security:
+        - ApiKeyAuth: []
       parameters:
-        - name: chainId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "../openapi.yaml#/components/parameters/ChainIdParam"
         - name: sellToken
           in: query
           required: true
+          description: Address or symbol of the token to sell.
           schema:
             type: string
+            example: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
         - name: buyToken
           in: query
           required: true
+          description: Address or symbol of the token to buy.
           schema:
             type: string
+            example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
         - name: sellAmount
           in: query
           required: true
+          description: Amount of sell token in its smallest unit.
           schema:
             type: string
+            pattern: '^\d+$'
+            example: "1000000000000000000"
         - name: strategy
           in: query
+          description: Routing strategy to use. Defaults to `auto` if omitted.
           schema:
             type: string
+            enum: [fast, split, converge, auto]
+            default: auto
+            example: "split"
         - name: timeout
           in: query
+          description: Maximum time (milliseconds) to spend searching for routes.
           schema:
             type: integer
+            minimum: 100
+            maximum: 30000
+            default: 5000
+            example: 5000
       responses:
         "200":
-          description: OK
+          description: Successfully computed the best quote.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  requestId:
-                    type: string
-                  strategy:
-                    type: string
-                  quote:
-                    type: object
+                $ref: "#/components/schemas/QuoteResponse"
+              example:
+                requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                strategy: "split"
+                quote:
+                  sellToken: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                  buyToken: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  sellAmount: "1000000000000000000"
+                  buyAmount: "3465000000"
+                  price: "3465.00"
+                  sources:
+                    - name: "UniswapV3"
+                      proportion: "0.7"
+                    - name: "Curve"
+                      proportion: "0.3"
+                  estimatedGas: "210000"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "429":
+          $ref: "../openapi.yaml#/components/responses/RateLimited"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
   /v1/quotes/{chainId}/batch:
     post:
       tags:
         - Quotes
       summary: Batch quotes
-      description: Accepts an array of quote requests and returns estimates for each. Useful to request multiple quotes in a single call.
+      description: |
+        Submit **multiple quote requests** in a single API call and receive
+        estimates for each. Useful for dashboards or comparison UIs where you
+        need pricing for several pairs simultaneously.
+
+        The request body must contain an array of 1–50 quote items.
       operationId: quoteBatch
+      security:
+        - ApiKeyAuth: []
       parameters:
-        - name: chainId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "../openapi.yaml#/components/parameters/ChainIdParam"
       requestBody:
         required: true
+        description: Array of quote requests to process.
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/QuoteBatchRequest"
+              $ref: "../openapi.yaml#/components/schemas/QuoteBatchRequest"
       responses:
         "200":
-          description: OK
+          description: Successfully computed batch quotes.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
@@ -122,30 +200,133 @@ paths:
                 properties:
                   requestId:
                     type: string
+                    format: uuid
+                    description: Unique identifier for this request.
                   results:
                     type: array
+                    description: Array of quote results (one per input item, same order).
                     items:
                       type: object
+                      properties:
+                        sellToken:
+                          type: string
+                          description: Sell token address or symbol.
+                        buyToken:
+                          type: string
+                          description: Buy token address or symbol.
+                        sellAmount:
+                          type: string
+                          description: Sell amount in smallest unit.
+                        buyAmount:
+                          type: string
+                          description: Estimated buy amount in smallest unit.
+                        price:
+                          type: string
+                          description: Human-readable price ratio.
+                        error:
+                          type: string
+                          description: Error message if this individual quote failed.
+              example:
+                requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                results:
+                  - sellToken: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                    buyToken: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                    sellAmount: "1000000000000000000"
+                    buyAmount: "3450000000"
+                    price: "3450.00"
+                  - sellToken: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+                    buyToken: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                    sellAmount: "1000000000000000000000"
+                    buyAmount: "999500000"
+                    price: "0.9995"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "429":
+          $ref: "../openapi.yaml#/components/responses/RateLimited"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
 components:
   schemas:
     QuoteItem:
       type: object
+      description: A single quote request specifying the swap pair and amount.
       properties:
         sellToken:
           type: string
+          description: Address or symbol of the token to sell.
+          example: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
         buyToken:
           type: string
+          description: Address or symbol of the token to buy.
+          example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
         sellAmount:
           type: string
+          description: Amount of sell token in its smallest unit.
+          pattern: '^\d+$'
+          example: "1000000000000000000"
       required: ["sellToken", "buyToken", "sellAmount"]
       additionalProperties: false
+
     QuoteBatchRequest:
       type: object
+      description: Batch of quote requests (1–50 items).
       properties:
         quotes:
           type: array
+          description: Array of individual quote requests.
+          minItems: 1
+          maxItems: 50
           items:
             $ref: "#/components/schemas/QuoteItem"
       required: ["quotes"]
       additionalProperties: false
+
+    QuoteResponse:
+      type: object
+      description: Successful quote response envelope.
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          description: Unique request identifier.
+        strategy:
+          type: string
+          description: Routing strategy used for this quote.
+          enum: [fast, split, converge, auto]
+        quote:
+          type: object
+          description: The computed quote details.
+          properties:
+            sellToken:
+              type: string
+              description: Token being sold.
+            buyToken:
+              type: string
+              description: Token being bought.
+            sellAmount:
+              type: string
+              description: Sell amount in smallest unit.
+            buyAmount:
+              type: string
+              description: Estimated buy amount in smallest unit.
+            price:
+              type: string
+              description: Human-readable exchange-rate ratio.
+            sources:
+              type: array
+              description: Liquidity sources used for routing.
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: DEX adapter name.
+                  proportion:
+                    type: string
+                    description: Proportion of the trade routed through this source (0–1).
+            estimatedGas:
+              type: string
+              description: Estimated gas required for the swap transaction.

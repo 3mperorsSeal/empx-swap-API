@@ -2,13 +2,19 @@ paths:
   /v1/admin/seed:
     post:
       tags:
-        - Dashboard
-      summary: Seed tiers, endpoints and chain adapters (admin)
-      description: "Idempotent seeding endpoint to populate default tiers, endpoints, tier configs and chain adapters. Requires a bearer JWT with admin role."
+        - System
+      summary: Seed reference data (admin)
+      description: |
+        **Admin-only.** Idempotent seeding endpoint that populates default tiers,
+        API endpoints, tier configurations and chain adapters.
+
+        Requires a JWT with `admin` role in the `Authorization` header.
+      operationId: adminSeed
       security:
         - BearerAuth: []
       requestBody:
-        description: Optional body to control seeding (not used currently)
+        required: false
+        description: Optional control flags for seeding.
         content:
           application/json:
             schema:
@@ -16,10 +22,16 @@ paths:
               properties:
                 force:
                   type: boolean
+                  description: When `true`, re-seeds even if data already exists.
+                  default: false
+                  example: false
               additionalProperties: false
       responses:
         "200":
-          description: Seed completed
+          description: Seed completed successfully.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
@@ -27,16 +39,30 @@ paths:
                 properties:
                   ok:
                     type: boolean
+                    description: Whether the seed operation succeeded.
+                    example: true
                   tiers:
-                    type: number
+                    type: integer
+                    description: Number of tiers seeded/upserted.
+                    example: 4
                   endpoints:
-                    type: number
+                    type: integer
+                    description: Number of endpoints seeded.
+                    example: 12
                   adapters:
-                    type: number
+                    type: integer
+                    description: Number of chain adapters seeded.
+                    example: 6
+              example:
+                ok: true
+                tiers: 4
+                endpoints: 12
+                adapters: 6
         "401":
-          description: Unauthorized
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
         "403":
-          description: Forbidden
+          $ref: "../openapi.yaml#/components/responses/Forbidden"
         "500":
-          description: Server error
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
 components: {}

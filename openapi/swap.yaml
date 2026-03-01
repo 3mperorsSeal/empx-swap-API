@@ -4,50 +4,168 @@ paths:
       tags:
         - Swap
       summary: Build swap transaction
-      description: Build an unsigned swap transaction payload (and approval tx if needed) for the requested `sellToken` -> `buyToken` and `sellAmount`. Returns `tx` object ready for signing and submission.
+      description: |
+        Build an **unsigned swap transaction** payload for the requested
+        `sellToken` → `buyToken` swap on the given chain.
+
+        The response includes:
+        - A `tx` object with `to`, `data`, `value` and `gasLimit` — ready for
+          signing with any web3 wallet.
+        - An optional `approvalTx` if the sell token requires an ERC-20 approval
+          before the swap can execute.
+
+        > **Tip:** Include a `recipient` address to have the bought tokens sent
+        > directly to a different wallet.
       operationId: swapBuild
+      security:
+        - ApiKeyAuth: []
       parameters:
-        - name: chainId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "../openapi.yaml#/components/parameters/ChainIdParam"
       requestBody:
         required: true
+        description: Swap parameters including token pair, amount, and optional settings.
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SwapBuildRequest"
-            example:
-              sellToken: "ETH"
-              buyToken: "DAI"
-              sellAmount: "500000000000000000"
-              recipient: "0x0123456789abcdef0123456789abcdef01234567"
+              $ref: "../openapi.yaml#/components/schemas/SwapBuildRequest"
       responses:
         "200":
-          description: OK
+          description: Successfully built the swap transaction.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  requestId:
-                    type: string
-                  tx:
-                    type: object
+                $ref: "#/components/schemas/SwapBuildResponse"
+              example:
+                requestId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                tx:
+                  to: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+                  data: "0x5ae401dc..."
+                  value: "500000000000000000"
+                  gasLimit: "250000"
+                approvalTx: null
+                quote:
+                  sellToken: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                  buyToken: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+                  sellAmount: "500000000000000000"
+                  buyAmount: "1725000000000000000000"
+                  price: "3450.00"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "429":
+          $ref: "../openapi.yaml#/components/responses/RateLimited"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
 components:
   schemas:
     SwapBuildRequest:
       type: object
+      description: Request body for building an unsigned swap transaction.
       properties:
         sellToken:
           type: string
+          description: Address or symbol of the token being sold.
+          example: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
         buyToken:
           type: string
+          description: Address or symbol of the token being purchased.
+          example: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
         sellAmount:
           type: string
+          description: Amount of sell token in its smallest unit (e.g. wei).
+          pattern: '^\d+$'
+          example: "500000000000000000"
         recipient:
           type: string
+          description: |
+            Wallet address that will receive the bought tokens.
+            Must be a valid EVM address (`0x` + 40 hex chars).
+          pattern: "^0x[a-fA-F0-9]{40}$"
+          example: "0x0123456789abcdef0123456789abcdef01234567"
+        slippage:
+          type: number
+          description: Maximum acceptable slippage in basis points (0–10000).
+          minimum: 0
+          maximum: 10000
+          example: 50
+        fee:
+          type: number
+          description: Fee in basis points (0–10000).
+          minimum: 0
+          maximum: 10000
+          example: 30
+        deadline:
+          type: number
+          description: Unix timestamp after which the transaction is invalid.
+          example: 1709330400
       required: ["sellToken", "buyToken", "sellAmount"]
       additionalProperties: false
+
+    SwapBuildResponse:
+      type: object
+      description: Successful swap-build response with unsigned transaction(s).
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          description: Unique request identifier.
+        tx:
+          type: object
+          description: The main unsigned swap transaction — sign and broadcast this.
+          properties:
+            to:
+              type: string
+              description: Contract address to send the transaction to.
+              example: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+            data:
+              type: string
+              description: Encoded calldata for the swap.
+              example: "0x5ae401dc..."
+            value:
+              type: string
+              description: Native token value to send (in wei), e.g. for ETH swaps.
+              example: "500000000000000000"
+            gasLimit:
+              type: string
+              description: Estimated gas limit for the transaction.
+              example: "250000"
+        approvalTx:
+          type: object
+          nullable: true
+          description: |
+            If the sell token is an ERC-20 and needs approval, this contains
+            the unsigned approval transaction. `null` if no approval is needed.
+          properties:
+            to:
+              type: string
+              description: Token contract address.
+            data:
+              type: string
+              description: Encoded `approve()` calldata.
+            value:
+              type: string
+              description: Always "0" for approve transactions.
+            gasLimit:
+              type: string
+              description: Estimated gas for the approval.
+        quote:
+          type: object
+          description: The quote that was used to build the transaction.
+          properties:
+            sellToken:
+              type: string
+            buyToken:
+              type: string
+            sellAmount:
+              type: string
+            buyAmount:
+              type: string
+              description: Estimated buy amount in smallest unit.
+            price:
+              type: string
+              description: Human-readable exchange rate.

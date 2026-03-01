@@ -1,0 +1,580 @@
+{
+  "annotations": { "list": [] },
+  "description": "Per-partner API key usage: traffic, error rates, endpoint breakdown, and key activity",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "API Overview",
+      "type": "dashboard",
+      "url": "/d/dex-api-overview"
+    },
+    {
+      "title": "Quota & Billing",
+      "type": "dashboard",
+      "url": "/d/dex-quota-billing"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Summary",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          },
+          "unit": "short",
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "id": 101,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM api_usage_logs WHERE $__timeFilter(created_at)",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Requests",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "unit": "short",
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "id": 102,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT api_key_id) AS value FROM api_usage_logs WHERE $__timeFilter(created_at) AND api_key_id IS NOT NULL",
+          "refId": "A"
+        }
+      ],
+      "title": "Active API Keys",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "percent",
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "id": 103,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE status >= 400) / NULLIF(COUNT(*), 0), 1) AS value FROM api_usage_logs WHERE $__timeFilter(created_at)",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Rate",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          },
+          "unit": "short",
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "id": 104,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT q.api_key_id) AS value FROM api_usage_quotas_monthly q WHERE q.year = EXTRACT(YEAR FROM NOW()) AND q.month = EXTRACT(MONTH FROM NOW()) AND q.purchased_credits > 0 AND ROUND(100.0 * q.used_credits / NULLIF(q.purchased_credits, 0), 0) >= 80",
+          "refId": "A"
+        }
+      ],
+      "title": "Keys ≥80% Monthly Quota Used",
+      "type": "stat"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 110,
+      "title": "Traffic Over Time",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 6 },
+      "id": 111,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum", "max"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(aul.created_at, $__interval),\n  COALESCE(ak.key_prefix, 'unauthenticated') AS metric,\n  COUNT(*) AS value\nFROM api_usage_logs aul\nLEFT JOIN api_keys ak ON ak.id = aul.api_key_id\nWHERE $__timeFilter(aul.created_at)\n  AND ak.key_prefix IN (${key_prefix:singlequote})\nGROUP BY 1, 2\nORDER BY 1",
+          "metricColumn": "metric",
+          "refId": "A"
+        }
+      ],
+      "title": "Requests Over Time by API Key",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
+      "id": 112,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(created_at, $__interval),\n  '4xx' AS metric,\n  COUNT(*) FILTER (WHERE status BETWEEN 400 AND 499) AS value\nFROM api_usage_logs\nWHERE $__timeFilter(created_at)\nGROUP BY 1\nUNION ALL\nSELECT\n  $__timeGroupAlias(created_at, $__interval),\n  '5xx' AS metric,\n  COUNT(*) FILTER (WHERE status >= 500) AS value\nFROM api_usage_logs\nWHERE $__timeFilter(created_at)\nGROUP BY 1\nORDER BY 1",
+          "metricColumn": "metric",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Counts Over Time (4xx / 5xx)",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 120,
+      "title": "API Key Leaderboard",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Error Rate %" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.displayMode", "value": "color-text" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 5 },
+                    { "color": "red", "value": 15 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Total Calls" },
+            "properties": [
+              { "id": "custom.displayMode", "value": "color-background-solid" },
+              { "id": "color", "value": { "mode": "continuous-blues" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 15 },
+      "id": 121,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Total Calls" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COALESCE(ak.key_prefix, 'unauthenticated') AS \"API Key\",\n  COALESCE(ak.tier, '-') AS \"Tier\",\n  COUNT(*) AS \"Total Calls\",\n  COUNT(*) FILTER (WHERE aul.status >= 400 AND aul.status < 500) AS \"4xx Errors\",\n  COUNT(*) FILTER (WHERE aul.status >= 500) AS \"5xx Errors\",\n  ROUND(100.0 * COUNT(*) FILTER (WHERE aul.status >= 400) / NULLIF(COUNT(*), 0), 1) AS \"Error Rate %\",\n  COUNT(DISTINCT DATE(aul.created_at)) AS \"Active Days\",\n  MAX(aul.created_at)::text AS \"Last Seen\"\nFROM api_usage_logs aul\nLEFT JOIN api_keys ak ON ak.id = aul.api_key_id\nWHERE $__timeFilter(aul.created_at)\nGROUP BY ak.key_prefix, ak.tier\nORDER BY \"Total Calls\" DESC\nLIMIT 50",
+          "refId": "A"
+        }
+      ],
+      "title": "API Key Leaderboard",
+      "type": "table"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 130,
+      "title": "Endpoint Analysis",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Error %" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.displayMode", "value": "color-text" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 5 },
+                    { "color": "red", "value": 20 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Calls" },
+            "properties": [
+              { "id": "custom.displayMode", "value": "lcd-gauge" },
+              { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 14, "x": 0, "y": 26 },
+      "id": 131,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Calls" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  aul.path AS \"Endpoint\",\n  aul.method AS \"Method\",\n  COUNT(*) AS \"Calls\",\n  COUNT(*) FILTER (WHERE aul.status >= 400 AND aul.status < 500) AS \"4xx\",\n  COUNT(*) FILTER (WHERE aul.status >= 500) AS \"5xx\",\n  ROUND(100.0 * COUNT(*) FILTER (WHERE aul.status >= 400) / NULLIF(COUNT(*), 0), 1) AS \"Error %\"\nFROM api_usage_logs aul\nWHERE $__timeFilter(aul.created_at)\nGROUP BY aul.path, aul.method\nORDER BY \"Calls\" DESC\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Endpoints by Call Count",
+      "type": "table"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      },
+      "gridPos": { "h": 10, "w": 10, "x": 14, "y": 26 },
+      "id": 132,
+      "options": {
+        "displayMode": "lcd",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "/^Requests$/",
+          "values": false
+        },
+        "showUnfilled": true,
+        "text": {}
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COALESCE(ak.tier, 'unauthenticated') AS \"Tier\",\n  COUNT(*) AS \"Requests\",\n  COUNT(DISTINCT aul.api_key_id) AS \"Active Keys\"\nFROM api_usage_logs aul\nLEFT JOIN api_keys ak ON ak.id = aul.api_key_id\nWHERE $__timeFilter(aul.created_at)\nGROUP BY ak.tier\nORDER BY \"Requests\" DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Requests by Tier",
+      "type": "bargauge"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "id": 140,
+      "title": "Per-Key Endpoint Drilldown",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 },
+      "id": 141,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(aul.created_at, $__interval),\n  COALESCE(aul.path, 'unknown') AS metric,\n  COUNT(*) AS value\nFROM api_usage_logs aul\nLEFT JOIN api_keys ak ON ak.id = aul.api_key_id\nWHERE $__timeFilter(aul.created_at)\n  AND ak.key_prefix IN (${key_prefix:singlequote})\nGROUP BY 1, 2\nORDER BY 1",
+          "metricColumn": "metric",
+          "refId": "A"
+        }
+      ],
+      "title": "Endpoint Usage Over Time (filtered by Key)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Requests" },
+            "properties": [
+              { "id": "custom.displayMode", "value": "color-background-solid" },
+              { "id": "color", "value": { "mode": "continuous-blues" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 },
+      "id": 142,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Requests" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  aul.ip::text AS \"IP Address\",\n  COUNT(*) AS \"Requests\",\n  COUNT(DISTINCT aul.api_key_id) AS \"Keys Used\",\n  COUNT(*) FILTER (WHERE aul.status >= 400) AS \"Errors\",\n  ROUND(100.0 * COUNT(*) FILTER (WHERE aul.status >= 400) / NULLIF(COUNT(*), 0), 1) AS \"Error %\"\nFROM api_usage_logs aul\nWHERE $__timeFilter(aul.created_at)\n  AND aul.ip IS NOT NULL\nGROUP BY aul.ip\nORDER BY \"Requests\" DESC\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Client IPs",
+      "type": "table"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
+      "id": 150,
+      "title": "Key Lifecycle",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto" }
+        }
+      },
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 46 },
+      "id": 151,
+      "options": { "footer": { "show": false }, "showHeader": true },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  ak.key_prefix AS \"API Key\",\n  ak.tier AS \"Tier\",\n  COALESCE(u.email, 'N/A') AS \"Owner\",\n  ak.revoked AS \"Revoked\",\n  ak.created_at::text AS \"Created\",\n  ak.rotated_at::text AS \"Last Rotated\",\n  COALESCE(last_use.last_seen::text, 'Never') AS \"Last Used\"\nFROM api_keys ak\nLEFT JOIN users u ON u.id = ak.user_id\nLEFT JOIN (\n  SELECT api_key_id, MAX(created_at) AS last_seen\n  FROM api_usage_logs\n  GROUP BY api_key_id\n) last_use ON last_use.api_key_id = ak.id\nORDER BY ak.created_at DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "All API Keys — Lifecycle",
+      "type": "table"
+    },
+
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 46 },
+      "id": 152,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(created_at, $__interval),\n  tier AS metric,\n  COUNT(*) AS value\nFROM api_keys\nWHERE $__timeFilter(created_at)\nGROUP BY 1, tier\nORDER BY 1",
+          "metricColumn": "metric",
+          "refId": "A"
+        }
+      ],
+      "title": "New API Keys Registered Over Time",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["dex", "partners", "api-keys", "usage"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "postgres", "uid": "postgres" },
+        "definition": "SELECT DISTINCT key_prefix FROM api_keys WHERE revoked = false ORDER BY key_prefix",
+        "hide": 0,
+        "includeAll": true,
+        "allValue": null,
+        "label": "API Key",
+        "multi": true,
+        "name": "key_prefix",
+        "options": [],
+        "query": "SELECT DISTINCT key_prefix FROM api_keys WHERE revoked = false ORDER BY key_prefix",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Partner API Usage",
+  "uid": "dex-partner-usage",
+  "version": 1
+}

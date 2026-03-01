@@ -4,33 +4,55 @@ paths:
       tags:
         - Dashboard
       summary: List API keys (paginated)
+      description: |
+        Returns a paginated list of API keys belonging to the authenticated user.
+        Use `page` and `perPage` for pagination, and `userId` to filter by a
+        specific user (admin only).
       operationId: listKeys
       security:
         - BearerAuth: []
       parameters:
         - in: query
           name: page
+          description: Page number (1-based).
           schema:
             type: integer
+            minimum: 1
+            default: 1
+            example: 1
         - in: query
           name: perPage
+          description: Number of keys per page.
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 20
         - in: query
           name: userId
+          description: Filter by specific user ID (admin only).
           schema:
             type: integer
+            example: 1
       responses:
         "200":
-          description: Paginated keys
+          description: Paginated list of API keys.
+          headers:
+            X-Request-Id:
+              $ref: "../openapi.yaml#/components/headers/X-Request-Id"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/KeysList"
               examples:
                 sample:
-                  summary: Paginated keys example
+                  summary: Paginated keys
                   value:
+                    meta:
+                      total: 1
+                      page: 1
+                      perPage: 20
                     total: 1
                     rows:
                       - id: 2
@@ -41,16 +63,24 @@ paths:
                         whitelisted_domains: ["example.com"]
                         user_id: 1
                         created_at: "2026-01-14T00:00:00Z"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
     post:
       tags:
         - Dashboard
       summary: Create API key for logged-in user
+      description: |
+        Generate a new API key for the currently authenticated user.
+        The raw key is returned **once** — store it securely.
       operationId: createKey
       security:
         - BearerAuth: []
       requestBody:
         required: false
+        description: Optional tier selection for the new key.
         content:
           application/json:
             schema:
@@ -58,9 +88,13 @@ paths:
               properties:
                 tier:
                   type: string
+                  description: Pricing tier for the key.
+                  enum: [free, developer, pro, enterprise]
+                  default: free
+                  example: "pro"
       responses:
         "200":
-          description: Created key (raw key returned once)
+          description: API key created (raw key returned once).
           content:
             application/json:
               schema:
@@ -68,45 +102,75 @@ paths:
                 properties:
                   key:
                     type: string
+                    description: The raw API key. **Store securely — not retrievable again.**
+                    example: "bdb249817fa24149aae322077a0eefb2mkd0s9tf"
                   prefix:
                     type: string
+                    description: 8-character key prefix for identification.
+                    example: "bdb24981"
               examples:
                 created:
-                  summary: New API key returned
+                  summary: New API key
                   value:
                     key: "bdb249817fa24149aae322077a0eefb2mkd0s9tf"
                     prefix: "bdb24981"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
   /v1/keys/revoke:
     post:
       tags:
         - Dashboard
       summary: Revoke key by prefix
-      operationId: revokeKey
+      description: |
+        Revoke an API key identified by its 8-character prefix.
+        Once revoked, the key can no longer authenticate requests.
+      operationId: dashboardRevokeKey
       security:
         - BearerAuth: []
       requestBody:
         required: true
+        description: Key prefix to revoke.
         content:
           application/json:
             schema:
               $ref: "./auth.yaml#/components/schemas/RevokeKeyRequest"
       responses:
         "200":
-          description: Revoked
+          description: Key revoked successfully.
           content:
             application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
               examples:
                 ok:
-                  summary: revoke result
+                  summary: Revoke result
                   value:
                     ok: true
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "../openapi.yaml#/components/responses/NotFound"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
   /v1/keys/{prefix}/whitelist:
     patch:
       tags:
         - Dashboard
-      summary: Update whitelist for a key
+      summary: Update key whitelist
+      description: |
+        Update the IP and domain whitelists for an API key.
+        When whitelists are set, the key can only be used from the
+        specified IPs and/or referring domains.
       operationId: patchWhitelist
       security:
         - BearerAuth: []
@@ -114,24 +178,27 @@ paths:
         - in: path
           name: prefix
           required: true
+          description: 8-character key prefix.
           schema:
             type: string
+            example: "bdb24981"
       requestBody:
         required: true
+        description: Whitelist entries to set.
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/WhitelistPatchRequest"
       responses:
         "200":
-          description: Updated key
+          description: Whitelist updated — returns the updated key.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/KeyItem"
               examples:
                 updated:
-                  summary: Updated key example
+                  summary: Updated key
                   value:
                     id: 2
                     key_prefix: "bdb24981"
@@ -141,12 +208,23 @@ paths:
                     whitelisted_domains: ["example.com"]
                     user_id: 1
                     created_at: "2026-01-14T00:00:00Z"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "../openapi.yaml#/components/responses/NotFound"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
   /v1/keys/{prefix}/usage:
     get:
       tags:
         - Dashboard
-      summary: Usage analytics for a key (by day)
+      summary: Key usage analytics (daily)
+      description: |
+        Returns daily usage statistics for a specific API key, including
+        request counts and costs. Filter by date range with `start`/`end`.
       operationId: getUsage
       security:
         - BearerAuth: []
@@ -154,33 +232,46 @@ paths:
         - in: path
           name: prefix
           required: true
+          description: 8-character key prefix.
           schema:
             type: string
+            example: "bdb24981"
         - in: query
           name: start
+          description: Start of the date range (ISO 8601).
           schema:
             type: string
             format: date-time
+            example: "2026-01-01T00:00:00Z"
         - in: query
           name: end
+          description: End of the date range (ISO 8601).
           schema:
             type: string
             format: date-time
+            example: "2026-01-31T23:59:59Z"
         - in: query
           name: limit
+          description: Maximum number of daily buckets to return.
           schema:
             type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+            example: 30
       responses:
         "200":
-          description: Usage stats
+          description: Usage analytics for the specified key.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/UsageResponse"
               examples:
                 sample:
-                  summary: Usage by day
+                  summary: Daily usage
                   value:
+                    meta:
+                      limit: 30
                     apiKey:
                       id: 2
                       prefix: "bdb24981"
@@ -191,129 +282,153 @@ paths:
                       - day: "2026-01-12"
                         requests: 4
                         cost: 4
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "../openapi.yaml#/components/responses/NotFound"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
 
 components:
   schemas:
     KeyItem:
       type: object
+      description: An API key record.
       properties:
         id:
           type: integer
+          description: Internal key identifier.
+          example: 2
         key_prefix:
           type: string
+          description: 8-character non-secret key prefix.
+          example: "bdb24981"
         tier:
           type: string
+          description: Billing tier assigned to this key.
+          enum: [free, developer, pro, enterprise, test]
+          example: "pro"
         revoked:
           type: boolean
+          description: Whether the key has been revoked.
+          example: false
         whitelisted_ips:
           type: array
+          description: IPs allowed to use this key (empty = no restriction).
           items:
             type: string
+            format: ipv4
+          example: ["192.168.0.1"]
         whitelisted_domains:
           type: array
+          description: Domains allowed to use this key (empty = no restriction).
           items:
             type: string
+          example: ["example.com"]
         user_id:
           type: integer
+          description: ID of the user who owns this key.
+          example: 1
         created_at:
           type: string
           format: date-time
-      example:
-        id: 2
-        key_prefix: "bdb24981"
-        tier: "pro"
-        revoked: false
-        whitelisted_ips: ["192.168.0.1"]
-        whitelisted_domains: ["example.com"]
-        user_id: 1
-        created_at: "2026-01-14T00:00:00Z"
+          description: Key creation timestamp.
+          example: "2026-01-14T00:00:00Z"
+      required: [id, key_prefix, tier, revoked]
 
     KeysList:
       type: object
+      description: Paginated list of API keys.
       properties:
         meta:
           type: object
+          description: Pagination metadata.
           properties:
             total:
               type: integer
+              description: Total keys matching the query.
+              example: 1
             page:
               type: integer
+              description: Current page number.
+              example: 1
             perPage:
               type: integer
-
+              description: Items per page.
+              example: 20
         total:
           type: integer
+          description: Total keys matching the query.
+          example: 1
         rows:
           type: array
+          description: Array of key objects for this page.
           items:
             $ref: "#/components/schemas/KeyItem"
-      example:
-        total: 1
-        rows:
-          - id: 2
-            key_prefix: "bdb24981"
-            tier: "pro"
-            revoked: false
-            whitelisted_ips: ["192.168.0.1"]
-            whitelisted_domains: ["example.com"]
-            user_id: 1
-            created_at: "2026-01-14T00:00:00Z"
 
     WhitelistPatchRequest:
       type: object
+      description: Whitelist update payload.
       properties:
         whitelisted_ips:
           type: array
+          description: Array of IPv4 addresses to whitelist.
           items:
             type: string
+            format: ipv4
+          example: ["192.168.0.1"]
         whitelisted_domains:
           type: array
+          description: Array of domains to whitelist.
           items:
             type: string
-      example:
-        whitelisted_ips: ["192.168.0.1"]
-        whitelisted_domains: ["example.com"]
+          example: ["example.com"]
+      additionalProperties: false
 
     UsageBucket:
       type: object
+      description: Daily usage statistics bucket.
       properties:
         day:
           type: string
           format: date
+          description: Date of the usage bucket (YYYY-MM-DD).
+          example: "2026-01-13"
         requests:
           type: integer
+          description: Total API requests made on this day.
+          example: 10
         cost:
           type: integer
-      example:
-        day: "2026-01-13"
-        requests: 10
-        cost: 10
+          description: Total credits consumed on this day.
+          example: 10
+      required: [day, requests, cost]
 
     UsageResponse:
       type: object
+      description: Analytical usage data for a specific API key.
       properties:
         meta:
           type: object
           properties:
             limit:
               type: integer
-
+              description: Number of daily buckets returned.
+              example: 30
         apiKey:
           type: object
+          description: Key identification for these usage stats.
           properties:
             id:
               type: integer
+              example: 2
             prefix:
               type: string
+              example: "bdb24981"
+          required: [id, prefix]
         stats:
           type: array
+          description: Array of daily usage buckets, newest first.
           items:
             $ref: "#/components/schemas/UsageBucket"
-      example:
-        apiKey:
-          id: 2
-          prefix: "bdb24981"
-        stats:
-          - day: "2026-01-13"
-            requests: 10
-            cost: 10
+      required: [apiKey, stats]

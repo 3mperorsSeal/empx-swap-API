@@ -1,0 +1,51 @@
+global:
+  scrape_interval: 15s # How often to scrape targets
+  evaluation_interval: 15s # How often to evaluate alerting rules
+  scrape_timeout: 10s
+
+# Alerting (wire up your Alertmanager here when ready)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Rule files (add alert/recording rule files here)
+# rule_files:
+#   - "alerts/*.yml"
+
+scrape_configs:
+  # -----------------------------------------------------------------------
+  # Prometheus self-monitoring
+  # -----------------------------------------------------------------------
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # -----------------------------------------------------------------------
+  # DEX Aggregator API
+  #
+  # When running the API on your host machine (npm run start:dev):
+  #   host.docker.internal resolves to the host from inside Docker.
+  #
+  # When the backend container is uncommented in docker-compose.yml:
+  #   replace the target with  backend:3000
+  #
+  # If METRICS_TOKEN is set, add bearer_token below:
+  #   bearer_token: <your-token>
+  # -----------------------------------------------------------------------
+  - job_name: "dex-aggregator-api"
+    scrape_interval: 10s
+    metrics_path: /metrics
+    # ---- Uncomment the block below if METRICS_TOKEN is set in .env ----
+    # authorization:
+    #   type: Bearer
+    #   credentials: <paste-your-METRICS_TOKEN-value-here>
+    # --------------------------------------------------------------------
+    static_configs:
+      - targets: ["host.docker.internal:3000"]
+        labels:
+          service: "dex-aggregator-api"
+          env: "development"
+    # Uncomment if you set METRICS_TOKEN:
+    # authorization:
+    #   credentials: <your-token>

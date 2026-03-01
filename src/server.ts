@@ -4,7 +4,7 @@ import cors from "cors";
 import express, { NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import path from "path";
-import { collectDefaultMetrics, register } from "prom-client";
+import { metricsRegistry, initDefaultMetrics } from "./core/metrics";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
 
@@ -44,14 +44,39 @@ const allowedOrigins = (config.FRONTEND_ORIGINS || "")
   .filter(Boolean);
 
 const swaggerUiOptions = {
-  customSiteTitle: "DEX Aggregator API Documentation",
+  customSiteTitle: "EMPX Swap · API Documentation",
   customfavIcon: "/favicon.ico",
   explorer: true,
+  customCss: `
+    .swagger-ui .topbar { background-color: #1a1a2e; }
+    .swagger-ui .topbar .download-url-wrapper .select-label { color: #e0e0e0; }
+    .swagger-ui .info .title { font-size: 2.2em; }
+    .swagger-ui .info .description p { font-size: 14px; line-height: 1.6; }
+    .swagger-ui .opblock.opblock-get    .opblock-summary-method { background: #61affe; }
+    .swagger-ui .opblock.opblock-post   .opblock-summary-method { background: #49cc90; }
+    .swagger-ui .opblock.opblock-put    .opblock-summary-method { background: #fca130; }
+    .swagger-ui .opblock.opblock-delete .opblock-summary-method { background: #f93e3e; }
+    .swagger-ui .opblock.opblock-patch  .opblock-summary-method { background: #50e3c2; }
+    .swagger-ui .opblock .opblock-summary-description { font-style: italic; }
+    .swagger-ui .btn.execute { background-color: #4990e2; border-color: #4990e2; }
+    .swagger-ui .btn.execute:hover { background-color: #357abd; }
+    .swagger-ui section.models { border: 1px solid #e0e0e0; border-radius: 6px; }
+    .swagger-ui .model-box { background: #fafafa; }
+    .swagger-ui .response-col_status { font-weight: 700; }
+  `,
   swaggerOptions: {
     persistAuthorization: true,
     displayRequestDuration: true,
     filter: true,
     tryItOutEnabled: true,
+    docExpansion: "list",
+    defaultModelsExpandDepth: 2,
+    defaultModelExpandDepth: 2,
+    tagsSorter: "alpha",
+    operationsSorter: "alpha",
+    syntaxHighlight: { activate: true, theme: "monokai" },
+    requestSnippetsEnabled: true,
+    displayOperationId: true,
   },
 };
 
@@ -116,23 +141,22 @@ function setupRoutes(app: express.Express) {
   });
 
   // Health & Metrics
-  try {
-    collectDefaultMetrics();
-  } catch (err: any) {
-    // prom-client throws when metrics are registered twice (e.g. during hot reloads).
-    // Ignore duplicate-registration errors but surface others.
-    const msg = err?.message || String(err);
-    if (msg.includes("has already been registered")) {
-      logger.warn("metrics.already_registered", { message: msg });
-    } else {
-      logger.error("metrics.init_failed", { err });
-      throw err;
-    }
-  }
+  initDefaultMetrics();
+
   app.get("/metrics", async (req, res) => {
+    // Optionally protect with a bearer token configured via METRICS_TOKEN.
+    const metricsToken = config.METRICS_TOKEN;
+    if (metricsToken) {
+      const auth = req.headers["authorization"] || "";
+      const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+      if (provided !== metricsToken) {
+        res.status(401).set("WWW-Authenticate", 'Bearer realm="metrics"').end();
+        return;
+      }
+    }
     try {
-      res.set("Content-Type", register.contentType);
-      res.end(await register.metrics());
+      res.set("Content-Type", metricsRegistry.contentType);
+      res.end(await metricsRegistry.metrics());
     } catch (ex) {
       res.status(500).end(String(ex));
     }

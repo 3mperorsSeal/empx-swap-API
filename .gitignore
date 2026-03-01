@@ -50,6 +50,7 @@ Thumbs.db
 
 # Environment variables (keep sensitive files out of VCS)
 .env
+.env.production
 .env.*.local
 .env.local
 

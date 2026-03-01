@@ -3,11 +3,17 @@ paths:
     get:
       tags:
         - System
-      summary: Service status
-      description: Lightweight health endpoint returning service status and uptime.
+      summary: Service health check
+      description: |
+        Lightweight health endpoint returning service status, uptime and
+        environment info. No authentication required.
+
+        Use this for load-balancer health probes or uptime monitors.
+      operationId: getStatus
+      security: []
       responses:
         "200":
-          description: OK
+          description: Service is healthy.
           content:
             application/json:
               schema:
@@ -15,20 +21,62 @@ paths:
                 properties:
                   status:
                     type: string
+                    description: Current service status.
+                    enum: [ok, degraded, error]
+                    example: "ok"
+                  uptime:
+                    type: number
+                    description: Process uptime in seconds.
+                    example: 86400
+                  version:
+                    type: string
+                    description: API version string.
+                    example: "1.0.0"
+              example:
+                status: "ok"
+                uptime: 86400
+                version: "1.0.0"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
   /protected:
     get:
       tags:
         - System
       summary: Protected test route
-      description: Example protected endpoint that requires a valid API key and is subject to rate limiting.
+      description: |
+        Example protected endpoint that requires a valid API key and is
+        subject to rate limiting. Returns a simple success message.
+
+        Useful for testing API key authentication during integration setup.
+      operationId: protectedTest
       security:
         - ApiKeyAuth: []
       responses:
         "200":
-          description: OK
+          description: API key is valid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Confirmation message.
+                    example: "Protected route accessed successfully"
+              example:
+                message: "Protected route accessed successfully"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/Unauthorized"
+        "429":
+          $ref: "../openapi.yaml#/components/responses/RateLimited"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/InternalError"
+
 components:
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
       in: header
       name: X-API-KEY
+      description: API key passed in the `X-API-KEY` request header.
