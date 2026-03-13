@@ -16,7 +16,7 @@ import type {
 
 export class ViemBlockchainAdapter implements BlockchainAdapter {
   async getQuote(input: GetQuoteInput): Promise<QuoteResult> {
-    const strategy = input.strategy || "best";
+    const strategy = input.strategy ?? "nosplit"; // "best"/"converge"/"split" not yet implemented
     const result = await SmartRouter.getBestQuote(
       input.chainId,
       input.tokenIn,

@@ -77,6 +77,46 @@ export const EMPSEAL_ROUTER_ABI = [
   },
   {
     type: "function",
+    name: "swapNoSplitFromETH",
+    stateMutability: "payable",
+    inputs: [
+      {
+        name: "trade",
+        type: "tuple",
+        components: [
+          { name: "amountIn", type: "uint256" },
+          { name: "amountOut", type: "uint256" },
+          { name: "path", type: "address[]" },
+          { name: "adapters", type: "address[]" },
+        ],
+      },
+      { name: "to", type: "address" },
+      { name: "fee", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "swapNoSplitToETH",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "trade",
+        type: "tuple",
+        components: [
+          { name: "amountIn", type: "uint256" },
+          { name: "amountOut", type: "uint256" },
+          { name: "path", type: "address[]" },
+          { name: "adapters", type: "address[]" },
+        ],
+      },
+      { name: "to", type: "address" },
+      { name: "fee", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
     name: "executeSplitSwap",
     stateMutability: "nonpayable",
     inputs: [
@@ -150,6 +190,52 @@ export const EMPSEAL_ROUTER_ABI = [
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "address" }],
+  },
+  // ── Query functions ──────────────────────────────────────────────────────
+  {
+    type: "function",
+    name: "findBestPath",
+    stateMutability: "view",
+    inputs: [
+      { name: "_amountIn", type: "uint256" },
+      { name: "_tokenIn", type: "address" },
+      { name: "_tokenOut", type: "address" },
+      { name: "_maxSteps", type: "uint256" },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "amounts", type: "uint256[]" },
+          { name: "adapters", type: "address[]" },
+          { name: "path", type: "address[]" },
+          { name: "gasEstimate", type: "uint256" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "queryNoSplit",
+    stateMutability: "view",
+    inputs: [
+      { name: "_amountIn", type: "uint256" },
+      { name: "_tokenIn", type: "address" },
+      { name: "_tokenOut", type: "address" },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "adapter", type: "address" },
+          { name: "tokenIn", type: "address" },
+          { name: "tokenOut", type: "address" },
+          { name: "amountOut", type: "uint256" },
+        ],
+      },
+    ],
   },
 ] as const;
 

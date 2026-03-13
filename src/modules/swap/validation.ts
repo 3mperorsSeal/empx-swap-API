@@ -9,8 +9,7 @@ export const swapBuildSchema = z.object({
     .regex(
       /^0x[a-fA-F0-9]{40}$|^[a-zA-Z]{3,5}$/,
       "Invalid recipient address or symbol",
-    )
-    .optional(),
+    ),
   fee: z.number().min(0).max(10000).optional(),
   deadline: z.number().positive().optional(),
   slippage: z.number().min(0).max(10000).optional(),

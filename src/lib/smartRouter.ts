@@ -42,6 +42,37 @@ export interface AdapterQuote {
   path: string[];
 }
 
+/**
+ * Result returned by findBestPath.
+ * Ranks all available nosplit adapter quotes and exposes the winner
+ * as well as the full ranked list for inspection / fallback.
+ */
+export interface BestPathResult {
+  /** Best adapter address */
+  bestAdapter: string;
+  /** Expected output amount (as string to preserve bigint precision) */
+  amountOut: string;
+  /** Minimum output after slippage (default 0.5%) */
+  amountOutMin: string;
+  /** Full token path for this route (may be multi-hop) */
+  path: string[];
+  /** All adapter addresses used along the path, in order */
+  adapters: string[];
+  /** All intermediate amounts along the path */
+  amounts: string[];
+  /** Price impact as a percentage (0–100) */
+  priceImpact: number;
+  /** All adapter quotes ranked best-first (populated in mock mode; empty in on-chain mode) */
+  allQuotes: AdapterQuote[];
+  meta: {
+    quotedAt: number;
+    chainId: number;
+    computationTime: number;
+    strategy: "nosplit";
+    mode: "onchain" | "mock";
+  };
+}
+
 export interface QuoteResult {
   amountIn: string;
   amountOut: string;
@@ -92,27 +123,17 @@ export interface SwapBuildResult {
   };
 }
 
-// Mock adapters for when real contracts aren't available
-const MOCK_ADAPTERS = [
-  "0x1111111111111111111111111111111111111111", // Mock UniswapV2 style
-  "0x2222222222222222222222222222222222222222", // Mock SushiSwap style
-  "0x3333333333333333333333333333333333333333", // Mock Curve style
-  "0x4444444444444444444444444444444444444444", // Mock Balancer style
-];
+// Mock adapters have been disabled — all adapter quotes must come from on-chain calls.
 
-// Mock price rates (simplified) - used when real contracts aren't available
-const MOCK_RATES: Record<string, number> = {
-  ETH: 2000,
-  WETH: 2000,
-  PLS: 0.0001,
-  WPLS: 0.0001,
-  PULSE: 0.0001,
-  USDC: 1,
-  USDT: 1,
-  DAI: 1,
-  MATIC: 0.8,
-  WMATIC: 0.8,
-};
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const GENERIC_NATIVE_SYMBOLS = new Set(["eth", "pls", "matic", "pulse"]);
+
+type NoSplitFunctionName =
+  | "swapNoSplit"
+  | "swapNoSplitFromPLS"
+  | "swapNoSplitToPLS"
+  | "swapNoSplitFromETH"
+  | "swapNoSplitToETH";
 
 /**
  * Normalize and validate an address
@@ -151,6 +172,64 @@ function normalizeAddress(
  * Switch to real mode by configuring contract addresses in config.ts
  */
 export class SmartRouter {
+  private static isZeroAddress(token: string): boolean {
+    return token.toLowerCase() === ZERO_ADDRESS;
+  }
+
+  private static isNativeLikeToken(chainId: number, token: string): boolean {
+    const lower = token.toLowerCase();
+    if (GENERIC_NATIVE_SYMBOLS.has(lower) || this.isZeroAddress(lower)) {
+      return true;
+    }
+
+    const config = getChainConfig(chainId);
+    if (!config) {
+      return false;
+    }
+
+    return (
+      lower === config.nativeCurrency.symbol.toLowerCase() ||
+      lower === config.symbol.toLowerCase()
+    );
+  }
+
+  /**
+   * Converts native inputs (symbol or zero address) to wrapped token address.
+   * Non-native addresses are returned checksummed.
+   */
+  private static toRouterTokenAddress(chainId: number, token: string): Address {
+    const config = getChainConfig(chainId);
+    if (!config) {
+      throw new Error(`No chain config for chainId ${chainId}`);
+    }
+
+    if (this.isNativeLikeToken(chainId, token)) {
+      return getAddress(config.wrappedNative);
+    }
+
+    return getAddress(token);
+  }
+
+  private static getNoSplitFunctionName(
+    chainId: number,
+    isNativeIn: boolean,
+    isNativeOut: boolean,
+  ): NoSplitFunctionName {
+    if (isNativeIn && isNativeOut) {
+      throw new Error("Native-to-native swap is not supported for NOSPLIT route");
+    }
+
+    if (!isNativeIn && !isNativeOut) {
+      return "swapNoSplit";
+    }
+
+    if (chainId === 369) {
+      return isNativeIn ? "swapNoSplitFromPLS" : "swapNoSplitToPLS";
+    }
+
+    return isNativeIn ? "swapNoSplitFromETH" : "swapNoSplitToETH";
+  }
+
   /**
    * Get quotes from all available adapters
    * Uses real on-chain calls if contracts are configured, otherwise falls back to mocks
@@ -161,25 +240,32 @@ export class SmartRouter {
     tokenOut: string,
     amountIn: bigint,
   ): Promise<AdapterQuote[]> {
-    // Check if we can make real calls
-    if (canMakeRealCalls(chainId)) {
-      return this.getRealAdapterQuotes(chainId, tokenIn, tokenOut, amountIn);
-    } else {
-      logger.info("Using mock adapter quotes (contracts not configured)", {
-        chainId,
-      });
-      return this.getMockAdapterQuotes(chainId, tokenIn, tokenOut, amountIn);
+    const routedTokenIn = this.toRouterTokenAddress(chainId, tokenIn);
+    const routedTokenOut = this.toRouterTokenAddress(chainId, tokenOut);
+
+    // Real on-chain calls are required — mock fallback has been disabled.
+    if (!canMakeRealCalls(chainId)) {
+      throw new Error(
+        `getAllAdapterQuotes: contracts not configured for chain ${chainId}. Mock adapter fallback is disabled.`,
+      );
     }
+
+    return this.getRealAdapterQuotes(
+      chainId,
+      routedTokenIn,
+      routedTokenOut,
+      amountIn,
+    );
   }
 
   /**
-   * Get real quotes from on-chain adapters
-   * TODO: Implement multicall for batch querying
+   * Get real quotes from the on-chain router using queryNoSplit.
+   * The router iterates all its registered adapters and returns the best one.
    */
   private static async getRealAdapterQuotes(
     chainId: number,
-    tokenIn: string,
-    tokenOut: string,
+    tokenIn: Address,
+    tokenOut: Address,
     amountIn: bigint,
   ): Promise<AdapterQuote[]> {
     const client = getPublicClient(chainId);
@@ -187,44 +273,44 @@ export class SmartRouter {
       throw new Error(`No RPC client for chain ${chainId}`);
     }
 
-    // TODO: Query actual adapters from chain
-    // For now, return empty array - will be filled when adapters are deployed
-    logger.warn("Real adapter queries not yet implemented", { chainId });
-    return [];
-  }
-
-  /**
-   * Get mock quotes from simulated adapters
-   */
-  private static getMockAdapterQuotes(
-    chainId: number,
-    tokenIn: string,
-    tokenOut: string,
-    amountIn: bigint,
-  ): AdapterQuote[] {
-    const quotes: AdapterQuote[] = [];
-
-    // Calculate base output using mock prices
-    const priceIn = this.getMockPrice(tokenIn);
-    const priceOut = this.getMockPrice(tokenOut);
-    const baseOutput = Number(amountIn) * (priceIn / priceOut);
-
-    // Generate slightly different quotes for each mock adapter
-    for (const adapter of MOCK_ADAPTERS) {
-      // Variance between 97% and 102% of base output
-      const variance = 0.97 + Math.random() * 0.05;
-      quotes.push({
-        adapter,
-        amountOut: BigInt(Math.floor(baseOutput * variance)).toString(),
-        path: [tokenIn, tokenOut],
-      });
+    const config = getChainConfig(chainId);
+    if (!config) {
+      throw new Error(`No chain config for chainId ${chainId}`);
     }
 
-    // Sort by best output first
-    return quotes.sort((a, b) =>
-      Number(BigInt(b.amountOut) - BigInt(a.amountOut)),
-    );
+    try {
+      const result = await client.readContract({
+        address: config.routerAddress,
+        abi: EMPSEAL_ROUTER_ABI,
+        functionName: "queryNoSplit",
+        args: [amountIn, tokenIn, tokenOut],
+      });
+
+      if (!result || result.amountOut === 0n) {
+        logger.warn("queryNoSplit returned no liquidity", { chainId, tokenIn, tokenOut });
+        return [];
+      }
+
+      logger.debug("queryNoSplit result", {
+        chainId,
+        adapter: result.adapter,
+        amountOut: result.amountOut.toString(),
+      });
+
+      return [
+        {
+          adapter: result.adapter,
+          amountOut: result.amountOut.toString(),
+          path: [tokenIn, tokenOut],
+        },
+      ];
+    } catch (error) {
+      logger.error("queryNoSplit contract call failed", { chainId, error });
+      return [];
+    }
   }
+
+  // getMockAdapterQuotes has been removed — mock adapter fallback is disabled.
 
   /**
    * Get best quote across all routing strategies
@@ -238,142 +324,49 @@ export class SmartRouter {
   ): Promise<QuoteResult> {
     const startTime = Date.now();
 
-    // For "fast" or "nosplit", just get the best single adapter
+    // For "fast" or "nosplit", use router.findBestPath.
+    // This returns the full selected route including every adapter hop.
     if (strategy === "fast" || strategy === "nosplit") {
-      const allQuotes = await this.getAllAdapterQuotes(
-        chainId,
-        tokenIn,
-        tokenOut,
-        amountIn,
-      );
-
-      if (allQuotes.length === 0) {
-        throw new Error("No liquidity found for this token pair");
-      }
-
-      const best = allQuotes[0];
-      const bestAmountOut = BigInt(best.amountOut);
+      const bestPath = await this.findBestPath(chainId, tokenIn, tokenOut, amountIn);
 
       return {
         amountIn: amountIn.toString(),
-        amountOut: best.amountOut,
-        amountOutMin: ((bestAmountOut * 995n) / 1000n).toString(), // 0.5% slippage
+        amountOut: bestPath.amountOut,
+        amountOutMin: bestPath.amountOutMin,
         route: {
           type: "NOSPLIT",
-          path: best.path,
-          adapters: [best.adapter],
+          path: bestPath.path,
+          adapters: bestPath.adapters,
         },
-        priceImpact: this.calculatePriceImpact(
-          tokenIn,
-          tokenOut,
-          amountIn,
-          bestAmountOut,
-        ),
+        priceImpact: bestPath.priceImpact,
         meta: {
-          quotedAt: Math.floor(Date.now() / 1000),
+          quotedAt: bestPath.meta.quotedAt,
           chainId,
           computationTime: Date.now() - startTime,
         },
       };
     }
 
-    // For "best", "converge", or "split", we would run more complex routing
-    // For now, simulate a better route than single-path
-    const allQuotes = await this.getAllAdapterQuotes(
-      chainId,
-      tokenIn,
-      tokenOut,
-      amountIn,
+    // CONVERGE / SPLIT / BEST strategies are not yet implemented with real on-chain data.
+    // Mock-based simulation has been disabled to prevent conflicts with real calldata building.
+    throw new Error(
+      `Strategy "${strategy}" is not yet supported. Use "nosplit" or "fast" instead.`,
     );
-
-    if (allQuotes.length === 0) {
-      throw new Error("No liquidity found for this token pair");
-    }
-
-    const bestSingleAmount = BigInt(allQuotes[0].amountOut);
-
-    // Simulate improved routing (2-4% better than single path)
-    const improvementFactor = 1.02 + Math.random() * 0.02;
-    const improvedAmount = BigInt(
-      Math.floor(Number(bestSingleAmount) * improvementFactor),
-    );
-
-    // Get wrapped native address for intermediate token
-    const config = getChainConfig(chainId);
-    const intermediateToken = config?.wrappedNative || allQuotes[0].path[0];
-
-    return {
-      amountIn: amountIn.toString(),
-      amountOut: improvedAmount.toString(),
-      amountOutMin: ((improvedAmount * 995n) / 1000n).toString(),
-      route: {
-        type: "CONVERGE",
-        intermediate: intermediateToken,
-        inputHops: [
-          {
-            adapter: allQuotes[0]?.adapter || MOCK_ADAPTERS[0],
-            proportion: 6000,
-          },
-          {
-            adapter: allQuotes[1]?.adapter || MOCK_ADAPTERS[1],
-            proportion: 4000,
-          },
-        ],
-        outputHop: {
-          adapter: allQuotes[2]?.adapter || MOCK_ADAPTERS[2],
-          proportion: 10000,
-        },
-      },
-      priceImpact: this.calculatePriceImpact(
-        tokenIn,
-        tokenOut,
-        amountIn,
-        improvedAmount,
-      ),
-      meta: {
-        quotedAt: Math.floor(Date.now() / 1000),
-        chainId,
-        computationTime: Date.now() - startTime,
-      },
-    };
   }
 
   /**
-   * Calculate price impact percentage
+   * Calculate price impact percentage.
+   * Returns 0 until a real on-chain oracle is wired up.
+   * Mock price lookups have been removed.
    */
   private static calculatePriceImpact(
-    tokenIn: string,
-    tokenOut: string,
-    amountIn: bigint,
-    amountOut: bigint,
+    _tokenIn: string,
+    _tokenOut: string,
+    _amountIn: bigint,
+    _amountOut: bigint,
   ): number {
-    // Simplified price impact calculation
-    // In production, this should use pool reserves and proper formulas
-    const priceIn = this.getMockPrice(tokenIn);
-    const priceOut = this.getMockPrice(tokenOut);
-
-    const expectedOutput = Number(amountIn) * (priceIn / priceOut);
-    const actualOutput = Number(amountOut);
-
-    const impact = ((expectedOutput - actualOutput) / expectedOutput) * 100;
-    return Math.max(0, Math.min(impact, 100)); // Clamp between 0-100%
-  }
-
-  /**
-   * Get mock price for a token (used when real oracle isn't available)
-   */
-  private static getMockPrice(token: string): number {
-    const upper = token.toUpperCase();
-
-    // Try to match common token symbols in address
-    for (const [symbol, price] of Object.entries(MOCK_RATES)) {
-      if (upper.includes(symbol)) {
-        return price;
-      }
-    }
-
-    // Default to 1:1 if unknown
-    return 1;
+    // TODO: replace with real pool-reserve-based price impact once oracle is available.
+    return 0;
   }
 
   /**
@@ -390,7 +383,7 @@ export class SmartRouter {
       route,
       fee = 0,
       deadline,
-      slippage = 50, // 0.50% default slippage
+      slippage = 15, // 0.50% default slippage
     } = request;
 
     // Normalize addresses
@@ -408,42 +401,33 @@ export class SmartRouter {
     // Calculate deadline (5 minutes from now if not provided)
     const txDeadline = deadline || Math.floor(Date.now() / 1000) + 300;
 
+    // Compute slippage-protected minimum output
+    // slippage is in basis points (e.g. 50 = 0.50%)
+    const slippageDenom = 10_000n;
+    const amountOutMin = (amountIn * (slippageDenom - BigInt(slippage))) / slippageDenom;
+
     // Build transaction based on route type
     let data: `0x${string}`;
     let value = "0";
 
-    // Check if tokenIn is native currency
-    const isNativeIn =
-      tokenIn.toLowerCase() === "eth" ||
-      tokenIn.toLowerCase() === "pls" ||
-      tokenIn.toLowerCase() === "matic";
-
-    const toAddress = (addr: string) => {
-      if (
-        addr.toLowerCase() === "eth" ||
-        addr.toLowerCase() === "pls" ||
-        addr.toLowerCase() === "matic" ||
-        addr.toLowerCase() === "pulse"
-      ) {
-        const config = getChainConfig(chainId);
-        return config
-          ? getAddress(config.wrappedNative)
-          : getAddress("0x0000000000000000000000000000000000000000");
-      }
-      return getAddress(addr);
-    };
+    const isNativeIn = this.isNativeLikeToken(chainId, tokenIn);
+    const isNativeOut = this.isNativeLikeToken(chainId, tokenOut);
+    const toAddress = (addr: string) => this.toRouterTokenAddress(chainId, addr);
 
     if (route.type === "NOSPLIT") {
       const path = (route.path || [tokenIn, tokenOut]).map(toAddress);
       const adapters = (route.adapters || []).map((a: string) => getAddress(a));
 
       data = this.encodeNoSplitSwap(
+        chainId,
         amountIn,
+        amountOutMin,
         path,
         adapters,
         recipient,
         fee,
         isNativeIn,
+        isNativeOut,
       );
 
       if (isNativeIn) {
@@ -455,20 +439,20 @@ export class SmartRouter {
         tokenIn,
         tokenOut,
         amountIn,
+        amountOutMin,
         recipient,
         fee,
         txDeadline,
-        slippage,
         toAddress,
       );
     } else if (route.type === "SPLIT") {
       data = this.encodeSplitSwap(
         route,
         amountIn,
+        amountOutMin,
         recipient,
         fee,
         txDeadline,
-        slippage,
         toAddress,
       );
     } else {
@@ -507,27 +491,141 @@ export class SmartRouter {
    * Encode NOSPLIT swap calldata
    */
   private static encodeNoSplitSwap(
+    chainId: number,
     amountIn: bigint,
+    amountOutMin: bigint,
     path: string[],
     adapters: string[],
     recipient: Address,
     fee: number,
     isNativeIn: boolean,
+    isNativeOut: boolean,
   ): `0x${string}` {
     const trade: Trade = createTrade(
       amountIn,
-      0n, // amountOut (minAmountOut will be checked in contract)
+      amountOutMin,
       path as Address[],
       adapters as Address[],
     );
 
-    const functionName = isNativeIn ? "swapNoSplitFromPLS" : "swapNoSplit";
+    const functionName = this.getNoSplitFunctionName(
+      chainId,
+      isNativeIn,
+      isNativeOut,
+    );
 
     return encodeFunctionData({
       abi: EMPSEAL_ROUTER_ABI,
       functionName,
       args: [trade, recipient, BigInt(fee)],
     });
+  }
+
+  /**
+   * Find the best single-path (nosplit) route across all available adapters.
+   *
+   * When contracts are configured this calls `router.findBestPath()` on-chain,
+   * which does multi-hop routing through trusted tokens. Falls back to mock
+   * data when contracts are not configured (dev / test mode).
+   *
+   * @param chainId     - Target chain
+   * @param tokenIn     - Input token address (or native symbol e.g. "eth")
+   * @param tokenOut    - Output token address
+   * @param amountIn    - Exact input amount in wei
+   * @param slippageBps - Slippage tolerance in basis points (default 50 = 0.5%)
+   * @param maxSteps    - Max hops the router may use (1–4, default 3)
+   */
+  static async findBestPath(
+    chainId: number,
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: bigint,
+    slippageBps: number = 50,
+    maxSteps: number = 3,
+  ): Promise<BestPathResult> {
+    const startTime = Date.now();
+    const routedTokenIn = this.toRouterTokenAddress(chainId, tokenIn);
+    const routedTokenOut = this.toRouterTokenAddress(chainId, tokenOut);
+
+    // ── On-chain mode ────────────────────────────────────────────────────
+    if (canMakeRealCalls(chainId)) {
+      const client = getPublicClient(chainId);
+      const config = getChainConfig(chainId);
+
+      if (!client || !config) {
+        throw new Error(`findBestPath: No client/config for chain ${chainId}`);
+      }
+
+      const maxAllowedSteps = Math.max(1, config.maxHops || 1);
+      const clampedSteps = Math.min(Math.max(maxSteps, 1), maxAllowedSteps);
+
+      let offer: { amounts: readonly bigint[]; adapters: readonly Address[]; path: readonly Address[]; gasEstimate: bigint };
+
+      try {
+        offer = await client.readContract({
+          address: config.routerAddress,
+          abi: EMPSEAL_ROUTER_ABI,
+          functionName: "findBestPath",
+          args: [amountIn, routedTokenIn, routedTokenOut, BigInt(clampedSteps)],
+        });
+      } catch (error) {
+        logger.error("findBestPath contract call failed", { chainId, error });
+        throw new Error(`findBestPath: on-chain call failed for chain ${chainId}`);
+      }
+
+      // Empty path means the router found no route
+      if (!offer.path || offer.path.length === 0 || !offer.amounts || offer.amounts.length === 0) {
+        throw new Error(
+          `findBestPath: No liquidity found for ${tokenIn} → ${tokenOut} on chain ${chainId}`,
+        );
+      }
+
+      const bestAmountOut = offer.amounts[offer.amounts.length - 1];
+      const slippageDenom = 10_000n;
+      const amountOutMin = (
+        (bestAmountOut * (slippageDenom - BigInt(slippageBps))) / slippageDenom
+      ).toString();
+
+      const priceImpact = this.calculatePriceImpact(
+        tokenIn,
+        tokenOut,
+        amountIn,
+        bestAmountOut,
+      );
+
+      logger.debug("findBestPath (onchain): route found", {
+        chainId,
+        tokenIn: routedTokenIn,
+        tokenOut: routedTokenOut,
+        path: offer.path,
+        adapters: offer.adapters,
+        amountOut: bestAmountOut.toString(),
+        priceImpact,
+      });
+
+      return {
+        bestAdapter: offer.adapters[0] ?? "",
+        amountOut: bestAmountOut.toString(),
+        amountOutMin,
+        path: [...offer.path],
+        adapters: [...offer.adapters],
+        amounts: offer.amounts.map((a) => a.toString()),
+        priceImpact,
+        allQuotes: [], // not meaningful in on-chain mode
+        meta: {
+          quotedAt: Math.floor(Date.now() / 1000),
+          chainId,
+          computationTime: Date.now() - startTime,
+          strategy: "nosplit",
+          mode: "onchain",
+        },
+      };
+    }
+
+    // Mock fallback has been disabled — on-chain contracts must be configured.
+    throw new Error(
+      `findBestPath: contracts not configured for chain ${chainId}. Mock fallback is disabled.`,
+    );
   }
 
   /**
@@ -538,10 +636,10 @@ export class SmartRouter {
     tokenIn: Address,
     tokenOut: Address,
     amountIn: bigint,
+    amountOutMin: bigint,
     recipient: Address,
     fee: number,
     deadline: number,
-    slippage: number,
     toAddress: (addr: string) => Address,
   ): `0x${string}` {
     if (!route.intermediate || !route.inputHops || !route.outputHop) {
@@ -567,13 +665,10 @@ export class SmartRouter {
       ),
     };
 
-    // Calculate minAmountOut (will be provided from quote in real implementation)
-    const minAmountOut = 0n; // Contract will validate
-
     return encodeFunctionData({
       abi: EMPSEAL_ROUTER_ABI,
       functionName: "executeConvergeSwap",
-      args: [trade, minAmountOut, recipient, BigInt(fee), BigInt(deadline)],
+      args: [trade, amountOutMin, recipient, BigInt(fee), BigInt(deadline)],
     });
   }
 
@@ -583,10 +678,10 @@ export class SmartRouter {
   private static encodeSplitSwap(
     route: Route,
     amountIn: bigint,
+    amountOutMin: bigint,
     recipient: Address,
     fee: number,
     deadline: number,
-    slippage: number,
     toAddress: (addr: string) => Address,
   ): `0x${string}` {
     if (!route.splitPaths) {
@@ -599,15 +694,13 @@ export class SmartRouter {
       proportion: BigInt(sp.proportion),
     }));
 
-    const minAmountOut = 0n; // Will be calculated from quote
-
     return encodeFunctionData({
       abi: EMPSEAL_ROUTER_ABI,
       functionName: "executeSplitSwap",
       args: [
         paths,
         amountIn,
-        minAmountOut,
+        amountOutMin,
         recipient,
         BigInt(fee),
         BigInt(deadline),

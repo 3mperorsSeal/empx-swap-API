@@ -153,6 +153,55 @@ async function ensureChains() {
       native_currency: { symbol: "MATIC", decimals: 18 },
       metadata: { explorer: "https://polygonscan.com" },
     },
+    {
+      chain_id: "369",
+      name: "PulseChain",
+      rpc_urls: ["https://rpc.pulsechain.com/"],
+      native_currency: { symbol: "PLS", decimals: 18 },
+      metadata: { explorer: "https://scan.pulsechain.com" },
+    },
+    {
+      chain_id: "8453",
+      name: "Base",
+      rpc_urls: ["https://mainnet.base.org/"],
+      native_currency: { symbol: "ETH", decimals: 18 },
+      metadata: { explorer: "https://basescan.org" },
+    },
+    {
+      chain_id: "146",
+      name: "Sonic",
+      rpc_urls: ["https://sonic-rpc.mainnet.sonic.network/"],
+      native_currency: { symbol: "SONIC", decimals: 18 },
+      metadata: { explorer: "https://sonicscan.io" },
+    },
+    {
+      chain_id: "80094",
+      name: "Berachain",
+      rpc_urls: ["https://rpc.berachain.com/"],
+      native_currency: { symbol: "BERA", decimals: 18 },
+      metadata: { explorer: "https://berachain.com" },
+    },
+    {
+      chain_id: "30",
+      name: "Rootstock",
+      rpc_urls: ["https://rpc.rootstock.io/"],
+      native_currency: { symbol: "RBTC", decimals: 18 },
+      metadata: { explorer: "https://rootstockscan.io" },
+    },
+    {
+      chain_id: "10001",
+      name: "EthereumPoW",
+      rpc_urls: ["https://rpc.mainnet.ethereumpow.org/"],
+      native_currency: { symbol: "ETHW", decimals: 18 },
+      metadata: { explorer: "https://scan.ethereumpow.org" },
+    },
+    {
+      chain_id: "1329",
+      name: "Sei",
+      rpc_urls: ["https://sei.drpc.org"],
+      native_currency: { symbol: "SEI", decimals: 18 },
+      metadata: { explorer: "https://scan.sei.io" },
+    },
   ];
 
   const created: { id: number; chain_id: string }[] = [];

@@ -81,6 +81,7 @@ export async function buildSwapTransaction(
       tokenIn,
       tokenOut,
       sellAmount,
+      "nosplit", // "best" / "converge" / "split" are not yet wired to real on-chain data
     );
     route = quote.route;
   }

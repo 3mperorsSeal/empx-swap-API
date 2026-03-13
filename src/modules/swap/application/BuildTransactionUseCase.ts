@@ -79,6 +79,13 @@ export class BuildTransactionUseCase {
       fee = await getPartnerFee(input.apiKey);
     }
 
+    if (!input.recipient) {
+      throw AppError.BadRequest(
+        "missing_recipient",
+        "recipient address is required",
+      );
+    }
+
     let route = input.route;
     if (!route) {
       const quote = await this.blockchainAdapter.getQuote({
@@ -86,7 +93,7 @@ export class BuildTransactionUseCase {
         tokenIn,
         tokenOut,
         amountIn: sellAmount,
-        strategy: "best",
+        strategy: "nosplit", // "best"/"converge"/"split" are not yet wired to real on-chain data
       });
       route = quote.route;
     }
@@ -96,12 +103,12 @@ export class BuildTransactionUseCase {
       tokenIn,
       tokenOut,
       amountIn: sellAmount,
-      recipient: input.recipient || "0xUser",
+      recipient: input.recipient,
       route:
         route as import("../../../infrastructure/blockchain/adapters/types").Route,
       fee,
       deadline: input.deadline,
-      slippage: input.slippage ?? 50,
+      slippage: input.slippage ?? 15,
     });
   }
 }

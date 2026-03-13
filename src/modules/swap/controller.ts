@@ -27,6 +27,14 @@ export async function swapBuild(
       route,
     } = req.body;
 
+    // Validate required fields
+    if (!sellToken || !buyToken || !sellAmount || !recipient) {
+      throw AppError.BadRequest(
+        "missing_required_fields",
+        "Body must include: sellToken, buyToken, sellAmount, recipient",
+      );
+    }
+
     if (!(await service.ensureChain(chainId))) {
       throw AppError.NotFound(
         "chain_not_found",

@@ -12,35 +12,47 @@ import {
   http,
   PublicClient,
 } from "viem";
-import { mainnet, polygon } from "viem/chains";
+import { pulsechain, base, sei, berachain, rootstock, sonic } from "viem/chains";
 import { ADAPTER_ABI, EMPSEAL_ROUTER_ABI, ERC20_ABI } from "./abis";
 import { getChainConfig, hasRealContracts } from "./config";
 import logger from "../../core/logger";
 
 // Define PulseChain since it's not in viem's default chains
-const pulsechain = {
-  id: 369,
-  name: "PulseChain",
-  network: "pulsechain",
+const ethw = {
+  id: 10001,
+  name: 'EthereumPoW',
   nativeCurrency: {
+    name: 'EthereumPoW',
+    symbol: 'ETHW',
     decimals: 18,
-    name: "Pulse",
-    symbol: "PLS",
   },
   rpcUrls: {
-    default: { http: ["https://rpc.pulsechain.com"] },
-    public: { http: ["https://rpc.pulsechain.com"] },
+    default: {
+      http: ['https://mainnet.ethereumpow.org'],
+    },
   },
   blockExplorers: {
-    default: { name: "PulseScan", url: "https://scan.pulsechain.com" },
+    default: {
+      name: 'OKLink',
+      url: 'https://www.oklink.com/ethereum-pow',
+    },
+  },
+  contracts: {
+    multicall3: {
+      address: '0xca11bde05977b3631167028862be2a173976ca11',
+    },
   },
 } as const;
 
 // Map of chain ID to viem chain objects
 const VIEM_CHAINS = {
-  1: mainnet,
-  137: polygon,
   369: pulsechain,
+  8453: base,
+  1329: sei,
+  80094: berachain,
+  30: rootstock,
+  146: sonic,
+  10001: ethw,
 } as const;
 
 // Cache for publicClient instances
@@ -80,10 +92,11 @@ export function getPublicClient(chainId: number): PublicClient | null {
     });
 
     // Cache it
-    clientCache.set(chainId, client);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    clientCache.set(chainId, client as any as PublicClient);
 
     logger.info("Created viem client", { chainId, rpcUrl: config.rpcUrl });
-    return client;
+    return client as unknown as PublicClient;
   } catch (error) {
     logger.error("Failed to create viem client", { chainId, error });
     return null;
