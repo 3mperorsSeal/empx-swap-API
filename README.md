@@ -146,9 +146,10 @@ Reference docs:
 2. Create `.env` from `.env.example` (see template for required keys)
 3. Start infrastructure: `docker compose up postgres redis adminer prometheus grafana -d`
 4. Install dependencies: `npm install`
-5. Apply migrations: `npm run migrate:dev`
-6. Seed data: `npm run seed`
-7. Start API: `npm run start:dev` (default: `http://localhost:3000`)
+5. Generate Prisma client: `npm run prisma:generate`
+6. Apply migrations: `npm run migrate:dev`
+7. Seed data: `npm run seed`
+8. Start API: `npm run start:dev` (default: `http://localhost:3000`)
 
 ### Daily Workflow
 
